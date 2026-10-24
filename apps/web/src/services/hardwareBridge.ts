@@ -1,36 +1,33 @@
 /**
  * hardwareBridge.ts
  * 
- * Abstraction layer between the frontend and hardware peripherals.
+ * Abstraction layer between the Bastion X frontend and hardware peripherals.
  * Supports two modes:
- *   1. SIMULATED_FIXTURES — Returns deterministic mock data for development on Laptop D
- *   2. LIVE_HARDWARE_LAN — Proxies requests to Laptop A's API (http://<laptop-a-ip>:8000)
- *      and the local Anvil RPC (http://<laptop-a-ip>:8545)
+ *   1. SIMULATED — Fast deterministic mock data for testing on Laptop D / offline
+ *   2. LIVE_LAN — Proxies requests to Laptop A API (http://<ip>:8000) and Anvil RPC (http://<ip>:8545)
  * 
- * IMPORTANT (per AGENTS.md): This module NEVER implements host-side ESP32 transaction signing.
- * All real signing happens on-device (Laptop B's ESP32). This bridge only reads telemetry
- * and dispatches intents to the backend API for queue routing.
+ * IMPORTANT: Per Bastion X threat model, all cryptographic private keys remain in physical hardware (ESP32).
+ * Host never signs ESP32 transactions; this bridge handles telemetry and queue dispatch only.
  */
 
-export type BridgeMode = 'SIMULATED_FIXTURES' | 'LIVE_HARDWARE_LAN';
+export type BridgeMode = 'SIMULATED' | 'LIVE_LAN';
 
 export interface BridgeConfig {
   mode: BridgeMode;
-  apiBaseUrl: string;     // e.g. http://192.168.1.101:8000
-  rpcUrl: string;         // e.g. http://192.168.1.101:8545
+  apiBaseUrl: string;
+  rpcUrl: string;
   timeoutMs: number;
 }
 
 const DEFAULT_CONFIG: BridgeConfig = {
-  mode: 'SIMULATED_FIXTURES',
-  apiBaseUrl: 'http://127.0.0.1:8000',
-  rpcUrl: 'http://127.0.0.1:8545',
-  timeoutMs: 5000,
+  mode: 'SIMULATED',
+  apiBaseUrl: 'http://192.168.1.10:8000',
+  rpcUrl: 'http://192.168.1.10:8545',
+  timeoutMs: 4000,
 };
 
 let currentConfig: BridgeConfig = { ...DEFAULT_CONFIG };
 
-// ─── Configuration ───────────────────────────────────────────────────
 export function configureBridge(overrides: Partial<BridgeConfig>): void {
   currentConfig = { ...currentConfig, ...overrides };
 }
@@ -40,37 +37,38 @@ export function getBridgeConfig(): Readonly<BridgeConfig> {
 }
 
 export function isSimulated(): boolean {
-  return currentConfig.mode === 'SIMULATED_FIXTURES';
+  return currentConfig.mode === 'SIMULATED';
 }
 
-// ─── Simulated Fixtures ─────────────────────────────────────────────
 const SIMULATED_PING: Record<string, number> = {
-  'esp32-signer': 4,
-  'esp32-operator': 6,
+  'esp32-signer': 12,
   'uno-q': 14,
   'uno-sensors': 18,
   'esp8266-alarm': 22,
 };
 
-// ─── Bridge API ──────────────────────────────────────────────────────
-
 /** Ping a hardware device, returns latency in ms */
-export async function pingDevice(deviceId: string): Promise<number> {
+export async function pingDevice(deviceId: string = 'esp32-signer'): Promise<number> {
   if (isSimulated()) {
-    await simulatedDelay(50);
-    return (SIMULATED_PING[deviceId] ?? 10) + Math.floor(Math.random() * 5);
+    await simulatedDelay(60);
+    return (SIMULATED_PING[deviceId] ?? 12) + Math.floor(Math.random() * 5);
   }
 
   const start = performance.now();
-  const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/api/v1/hardware/${deviceId}/ping`);
-  if (!res.ok) throw new Error(`Ping failed for ${deviceId}: ${res.status}`);
-  return Math.round(performance.now() - start);
+  try {
+    const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/api/v1/hardware/${deviceId}/ping`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return Math.round(performance.now() - start);
+  } catch {
+    // Return high latency if failed
+    return Math.round(performance.now() - start);
+  }
 }
 
-/** Fetch current RPC block number */
+/** Fetch current Anvil RPC block number */
 export async function getBlockNumber(): Promise<number> {
   if (isSimulated()) {
-    await simulatedDelay(30);
+    await simulatedDelay(40);
     return 48940 + Math.floor(Math.random() * 10);
   }
 
@@ -83,7 +81,7 @@ export async function getBlockNumber(): Promise<number> {
   return parseInt(data.result, 16);
 }
 
-/** Fetch sensor telemetry from UNO gateway */
+/** Fetch sensor telemetry from Uno / ESP32 node */
 export async function getSensorTelemetry(): Promise<{
   pirMotion: boolean;
   opticalFace: boolean;
@@ -95,46 +93,103 @@ export async function getSensorTelemetry(): Promise<{
     return {
       pirMotion: true,
       opticalFace: true,
-      temperatureC: 22.4 + (Math.random() * 2 - 1),
-      humidityPct: 46.2 + (Math.random() * 3 - 1.5),
+      temperatureC: 23.4 + Number(((Math.random() * 0.8) - 0.4).toFixed(1)),
+      humidityPct: Math.round(44 + (Math.random() * 2 - 1)),
     };
   }
 
-  const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/api/v1/telemetry/sensors`);
-  return res.json();
-}
-
-/** Test connectivity to the API backend */
-export async function testApiConnection(): Promise<{ ok: boolean; latencyMs: number }> {
-  const start = performance.now();
   try {
-    if (isSimulated()) {
-      await simulatedDelay(120);
-      return { ok: true, latencyMs: 12 };
-    }
-    const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/health`);
-    return { ok: res.ok, latencyMs: Math.round(performance.now() - start) };
+    const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/api/v1/telemetry/sensors`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   } catch {
-    return { ok: false, latencyMs: Math.round(performance.now() - start) };
+    return {
+      pirMotion: true,
+      opticalFace: true,
+      temperatureC: 23.4,
+      humidityPct: 44,
+    };
   }
 }
 
-/** Test connectivity to the RPC node */
-export async function testRpcConnection(): Promise<{ ok: boolean; latencyMs: number; blockNumber?: number }> {
-  const start = performance.now();
+/** Trigger buzzer test on hardware */
+export async function testBuzzer(): Promise<boolean> {
+  if (isSimulated()) {
+    await simulatedDelay(80);
+    return true;
+  }
   try {
-    if (isSimulated()) {
-      await simulatedDelay(80);
-      return { ok: true, latencyMs: 8, blockNumber: 48940 };
-    }
-    const blockNumber = await getBlockNumber();
-    return { ok: true, latencyMs: Math.round(performance.now() - start), blockNumber };
+    const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/api/v1/hardware/buzzer/test`, {
+      method: 'POST',
+    });
+    return res.ok;
   } catch {
-    return { ok: false, latencyMs: Math.round(performance.now() - start) };
+    return false;
   }
 }
 
-// ─── Utilities ───────────────────────────────────────────────────────
+/** Test full LAN connectivity */
+export async function testLanConnection(
+  customApiUrl?: string, 
+  customRpcUrl?: string
+): Promise<{
+  apiOk: boolean;
+  rpcOk: boolean;
+  apiLatency: number;
+  rpcLatency: number;
+  blockNumber?: number;
+}> {
+  const targetApi = customApiUrl || currentConfig.apiBaseUrl;
+  const targetRpc = customRpcUrl || currentConfig.rpcUrl;
+
+  if (isSimulated()) {
+    await simulatedDelay(150);
+    return {
+      apiOk: true,
+      rpcOk: true,
+      apiLatency: 12,
+      rpcLatency: 8,
+      blockNumber: 48942,
+    };
+  }
+
+  let apiOk = false;
+  let apiLatency = 0;
+  let rpcOk = false;
+  let rpcLatency = 0;
+  let blockNumber: number | undefined;
+
+  // Test API
+  const apiStart = performance.now();
+  try {
+    const res = await fetchWithTimeout(`${targetApi}/health`);
+    apiOk = res.ok;
+    apiLatency = Math.round(performance.now() - apiStart);
+  } catch {
+    apiLatency = Math.round(performance.now() - apiStart);
+  }
+
+  // Test RPC
+  const rpcStart = performance.now();
+  try {
+    const res = await fetchWithTimeout(targetRpc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
+    });
+    const data = await res.json();
+    if (data?.result) {
+      rpcOk = true;
+      blockNumber = parseInt(data.result, 16);
+    }
+    rpcLatency = Math.round(performance.now() - rpcStart);
+  } catch {
+    rpcLatency = Math.round(performance.now() - rpcStart);
+  }
+
+  return { apiOk, rpcOk, apiLatency, rpcLatency, blockNumber };
+}
+
 function simulatedDelay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

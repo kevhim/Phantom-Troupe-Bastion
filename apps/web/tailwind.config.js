@@ -7,37 +7,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        ground: '#ffffff',
-        ink: '#000000',
-        surface: '#f0f0f0',
-        'surface-subtle': '#f7f7f7',
-        accent: '#c90000',
-        'accent-dark': '#a30000',
-        rule: '#000000',
-        'rule-light': '#e0e0e0',
-        'rule-subtle': '#ebebeb',
-        muted: '#555555',
-        'muted-light': '#777777',
+        slate: {
+          850: '#151f32',
+          950: '#020617',
+        }
       },
       fontFamily: {
-        sans: ['"Host Grotesk"', 'SwissMinimalistHost', 'Arial', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'Fira Code', 'monospace'],
+        sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        display: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['"JetBrains Mono"', '"IBM Plex Mono"', 'monospace'],
       },
-      letterSpacing: {
-        label: '0.12em',
-      },
-      borderWidth: {
-        'rule': '2px',
-      },
-      borderRadius: {
-        none: '0',
-        sm: '0',
-        DEFAULT: '0',
-        md: '0',
-        lg: '0',
-        xl: '0',
-        '2xl': '0',
-        full: '0',
+      boxShadow: {
+        'card': '0 2px 12px -4px rgba(15, 23, 42, 0.06), 0 1px 3px 0 rgba(15, 23, 42, 0.04)',
+        'card-hover': '0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px 0 rgba(15, 23, 42, 0.04)',
       }
     },
   },

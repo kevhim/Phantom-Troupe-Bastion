@@ -2,106 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --dp-color-ground: #ffffff;
-  --dp-color-ink: #000000;
-  --dp-color-surface: #f0f0f0;
-  --dp-color-accent: #c90000;
-  --dp-typography-face: "SwissMinimalistHost", "Host Grotesk", Arial, sans-serif;
-  --dp-typography-body: 16px;
-  --dp-typography-label: 12px;
-  --dp-typography-metadata: 14px;
-  --dp-typography-lead: 17px;
-  --dp-typography-item-title: 24px;
-  --dp-typography-regular: 400;
-  --dp-typography-strong: 700;
-  --dp-typography-display: 750;
-  --dp-typography-label-tracking: 0.12em;
-  --dp-typography-body-leading: 1.5;
-  --dp-spacing-gutter: clamp(20px, 3.3333cqw, 64px);
-  --dp-radius-control: 0;
-  --dp-border-rule: 2px;
-  --dp-motion-feedback: 0s;
+@layer base {
+  body {
+    background-color: #FAFAFA;
+    color: #0f172a;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
-@font-face {
-  font-family: 'SwissMinimalistHost';
-  src: local('Host Grotesk'), local('Arial');
+/* Subtle modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
-* {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  transition-duration: 0s !important;
-}
-
-body {
-  background-color: var(--dp-color-ground);
-  color: var(--dp-color-ink);
-  font-family: var(--dp-typography-face);
-  line-height: var(--dp-typography-body-leading);
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Sharp focus outlines for accessibility */
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid #000000 !important;
-  outline-offset: 2px !important;
-}
-
-@layer utilities {
-  .swiss-rule {
-    border-bottom: 2px solid #000000;
-  }
-  .swiss-rule-t {
-    border-top: 2px solid #000000;
-  }
-  .swiss-rule-r {
-    border-right: 2px solid #000000;
-  }
-  .swiss-rule-l {
-    border-left: 2px solid #000000;
-  }
-  .swiss-box {
-    border: 2px solid #000000;
-    background-color: #ffffff;
-  }
-  .swiss-box-surface {
-    border: 2px solid #000000;
-    background-color: #f0f0f0;
-  }
-  .swiss-box-black {
-    border: 2px solid #000000;
-    background-color: #000000;
-    color: #ffffff;
-  }
-  
-  .oled-screen {
-    background-color: #000000;
-    border: 3px solid #000000;
-    color: #ffffff;
-  }
-
-  .hazard-stripes {
-    background: repeating-linear-gradient(
-      -45deg,
-      #f0f0f0,
-      #f0f0f0 8px,
-      #e0e0e0 8px,
-      #e0e0e0 16px
-    );
-  }
-
-  /* Clean high contrast scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #f0f0f0;
-    border-left: 1px solid #000000;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #000000;
-  }
+/* OLED Display Glow (Physical hardware aesthetic) */
+.oled-screen-housing {
+  background-color: #09090b;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.9), 0 0 16px rgba(16, 185, 129, 0.06);
 }
