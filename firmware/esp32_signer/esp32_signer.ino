@@ -148,6 +148,32 @@ bool probeRFID() {
     return (v != 0x00 && v != 0xFF);
 }
 
+bool readCardUID(char outUid[21]) {
+    bool cardFound = false;
+    if (rfid.PICC_IsNewCardPresent()) {
+        cardFound = true;
+    } else {
+        byte bufferATQA[2];
+        byte bufferSize = sizeof(bufferATQA);
+        if (rfid.PICC_WakeupA(bufferATQA, &bufferSize) == MFRC522::STATUS_OK) {
+            cardFound = true;
+        }
+    }
+
+    if (cardFound && rfid.PICC_ReadCardSerial()) {
+        outUid[0] = '\0';
+        for (byte i = 0; i < rfid.uid.size && i < 10; i++) {
+            char b[3];
+            snprintf(b, sizeof(b), "%02X", rfid.uid.uidByte[i]);
+            strcat(outUid, b);
+        }
+        rfid.PICC_HaltA();
+        rfid.PCD_StopCrypto1();
+        return true;
+    }
+    return false;
+}
+
 void renderStatusScreen(const char* sessionState, const char* circuitBreakerState, const char* budgetText) {
     if (!statusDisplayHealthy) return;
     statusDisplay.clearDisplay();
@@ -683,6 +709,7 @@ void setup() {
     SPI.begin(PIN_RC522_SCK, PIN_RC522_MISO, PIN_RC522_MOSI, PIN_RC522_SS);
     rfid.PCD_Init();
     rfid.PCD_SetAntennaGain(MFRC522::RxGain_max); // Set maximum receiver antenna sensitivity (48 dB)
+    rfid.PCD_AntennaOn(); // Explicitly force RF transmitter antenna ON
 
     // Initial Status Emit
     JsonDocument doc;
@@ -971,17 +998,10 @@ void loop() {
 
     // 5. State Machine Processing
     switch (currentState) {
-        case STATE_IDLE:
+        case STATE_IDLE: {
             // Check for physical NFC/RFID card presentation in idle mode
-            if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-                char uidBuf[21] = "";
-                for (byte i = 0; i < rfid.uid.size && i < 10; i++) {
-                    char b[3];
-                    snprintf(b, sizeof(b), "%02X", rfid.uid.uidByte[i]);
-                    strcat(uidBuf, b);
-                }
-                rfid.PICC_HaltA();
-                rfid.PCD_StopCrypto1();
+            char uidBuf[21] = "";
+            if (readCardUID(uidBuf)) {
 
                 if (physicalCardJuniorUID.length() == 0) {
                     physicalCardJuniorUID = String(uidBuf);
@@ -1013,6 +1033,7 @@ void loop() {
                 }
             }
             break;
+        }
 
         case STATE_REVIEW_PAGE1:
             // Auto advance or advance on button 33 press
@@ -1075,18 +1096,10 @@ void loop() {
             }
             break;
 
-        case STATE_AWAITING_RFID:
+        case STATE_AWAITING_RFID: {
             // Physical RFID Presentation
-            if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-                char uidBuf[21] = "";
-                if (rfid.uid.size > 10) { invalidateCurrentReview("INVALID_UID", "UID too long"); break; }
-                for (byte i = 0; i < rfid.uid.size; i++) {
-                    char b[3];
-                    snprintf(b, sizeof(b), "%02X", rfid.uid.uidByte[i]);
-                    strcat(uidBuf, b);
-                }
-                rfid.PICC_HaltA();
-                rfid.PCD_StopCrypto1();
+            char uidBuf[21] = "";
+            if (readCardUID(uidBuf)) {
 
                 JsonDocument scanEvt;
                 scanEvt["event"] = "RFID_SCANNED_DURING_REVIEW";
@@ -1139,6 +1152,7 @@ void loop() {
                 invalidateCurrentReview("REVIEW_TIMEOUT", "Physical review timed out (> 30s)");
             }
             break;
+        }
 
         case STATE_AWAITING_APPROVE:
             // Physical button sustained hold validation (GPIO33 >= 1.5s)
