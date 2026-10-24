@@ -1,16 +1,5 @@
 import React from 'react';
 import { useBastionStore } from '../store/useBastionStore';
-import { 
-  Cpu, 
-  ChevronLeft, 
-  ChevronRight, 
-  CheckCircle, 
-  AlertOctagon, 
-  CreditCard,
-  Check,
-  ShieldCheck,
-  PlusCircle
-} from 'lucide-react';
 
 export const ApprovalsView: React.FC = () => {
   const store = useBastionStore();
@@ -30,120 +19,142 @@ export const ApprovalsView: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-          Hardware Signer Station
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Physical ESP32 #1 terminal with 128x64 OLED display, RC522 RFID reader, and GPIO hardware buttons.
-        </p>
-      </div>
-
+      {/* ═══ TWO-COLUMN REAL GLASS CARDS (24px PADDING) ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* ═══ LEFT CARD: PENDING HARDWARE REVIEW ═══ */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.06)] p-6 flex flex-col justify-between min-h-[480px]">
+        <div className="glass p-6 text-white/90 space-y-6 flex flex-col justify-between min-h-[520px]">
           <div>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={18} className="text-amber-500" />
-                <h2 className="text-base font-semibold text-slate-900">Pending Hardware Review</h2>
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-6">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-sm font-bold tracking-wide uppercase text-white/90">
+                    Exception Review Queue
+                  </h2>
+                  <span className="font-serif italic text-xs text-white/45">§ 2.1</span>
+                </div>
+                <p className="text-xs text-white/60 mt-0.5">
+                  Dual-authorization gate for policy overrides
+                </p>
               </div>
-              <span className="text-xs font-mono font-medium text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full">
-                {store.approvalQueue.length} Queued
-              </span>
+              <div className="flex items-center gap-1.5 font-mono text-[10px] text-amber-300">
+                <span className="w-1.5 h-1.5 rounded-none bg-amber-400 inline-block" />
+                <span className="uppercase tracking-wider font-bold">
+                  {store.approvalQueue.length} QUEUED
+                </span>
+              </div>
             </div>
 
             {approval ? (
-              <div className="space-y-5">
-                {/* Amount Banner */}
-                <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/70 text-amber-950">
-                  <div className="text-xs font-medium text-amber-700 uppercase tracking-wider mb-1">
-                    Amount Awaiting Authorization
+              <div className="space-y-6">
+                {/* Tinted Amber Review Header */}
+                <div className="glass-status-amber p-4 rounded-[8px] space-y-1">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-amber-300 font-bold">
+                    <span>Awaiting Dual-Key Signature</span>
+                    <span>Policy Exceeded</span>
                   </div>
-                  <div className="text-3xl font-mono font-bold text-slate-900">
+                  <div className="text-3xl font-mono font-bold tracking-tight text-white mt-1 tabular-nums">
                     ${approval.amountUsdc.toFixed(2)}{' '}
-                    <span className="text-sm font-normal text-slate-500">USDC</span>
+                    <span className="text-xs font-normal text-amber-200/70 font-sans">USDC</span>
                   </div>
-                  <div className="text-[11px] text-slate-600 mt-2">
-                    Exceeds the $25.00 auto-pay limit. Dual-authorization policy enforced.
+                  <div className="text-[11px] text-white/70 font-sans pt-1">
+                    Exceeds the $25.00 auto-pay limit. Physical cryptographic signature required on-chain.
                   </div>
                 </div>
 
-                {/* Details Breakdown */}
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Merchant Name</span>
-                    <span className="text-slate-900 font-medium">{approval.merchantName}</span>
+                {/* Glass Spec Table */}
+                <div className="glass rounded-[8px] divide-y divide-white/[0.08] text-xs overflow-hidden">
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Merchant Entity
+                    </span>
+                    <span className="text-white/90 font-bold uppercase tracking-tight">
+                      {approval.merchantName}
+                    </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Recipient Address</span>
-                    <span className="text-slate-700 font-mono">
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Recipient Address
+                    </span>
+                    <span className="text-white/70 font-mono text-[11px]">
                       {approval.recipientAddress.slice(0, 10)}...{approval.recipientAddress.slice(-6)}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Invoice Reference</span>
-                    <span className="text-slate-700 font-mono">{approval.invoiceId}</span>
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Invoice Reference
+                    </span>
+                    <span className="text-white/70 font-mono text-[11px]">
+                      {approval.invoiceId}
+                    </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Validity Window</span>
-                    <span className="text-emerald-700 font-mono font-medium">59m 30s remaining</span>
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Validity Window
+                    </span>
+                    <span className="text-emerald-300 font-mono font-bold text-[11px]">
+                      59M 30S REMAINING
+                    </span>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/60 text-[11px] text-slate-600 leading-relaxed">
-                  Review the 3 OLED pages on the right, tap an authorized RFID credential, and press <strong>GPIO 33</strong> to sign.
+                <div className="glass rounded-[8px] p-3 text-[11px] text-white/70 leading-relaxed font-sans">
+                  Inspect the 3 OLED pages on the right terminal. Verify transaction digest, select an authorized RFID tier, and press <strong>GPIO 33</strong> to sign.
                 </div>
               </div>
             ) : (
               <div className="py-16 text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
-                  <Check size={20} className="text-emerald-600" />
+                <div className="w-10 h-10 rounded-[8px] glass flex items-center justify-center mx-auto text-emerald-400 font-mono text-xs font-bold">
+                  ✓
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">
+                  <div className="text-xs uppercase tracking-[0.14em] font-bold text-white/90">
                     No Pending Exceptions
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                  <p className="text-xs text-white/60 mt-1 max-w-xs mx-auto">
                     All transactions under $25 are autonomously settled. Any transaction &gt;$25 routes here.
                   </p>
                 </div>
                 <button
                   onClick={handleQueueTestItem}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-medium text-white transition-all shadow-sm"
+                  className="glass-btn-primary py-2.5 px-4 text-xs uppercase tracking-[0.15em] font-medium transition-all cursor-pointer"
                 >
-                  <PlusCircle size={14} />
-                  <span>Queue $50 Over-Limit Test Tx</span>
+                  Queue $50 Over-Limit Test Tx →
                 </button>
               </div>
             )}
           </div>
 
-          <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-400 font-mono flex items-center justify-between">
-            <span>Hardware Model: ESP32-WROOM-32D</span>
+          <div className="pt-4 border-t border-white/[0.08] text-[10px] font-mono text-white/45 uppercase tracking-widest flex items-center justify-between">
+            <span>Hardware: ESP32-WROOM-32D</span>
             <span>Port: /dev/ttyUSB0 (Laptop B)</span>
           </div>
         </div>
 
-        {/* ═══ RIGHT CARD: ESP32 #1 PHYSICAL TERMINAL ═══ */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.06)] p-6 flex flex-col justify-between">
+        {/* ═══ RIGHT CARD: ESP32 PHYSICAL TERMINAL TWIN ═══ */}
+        <div className="glass p-6 text-white/90 space-y-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-              <div className="flex items-center gap-2">
-                <Cpu size={18} className="text-emerald-600" />
-                <h2 className="text-base font-semibold text-slate-900">ESP32 #1 Physical Terminal</h2>
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-sm font-bold tracking-wide uppercase text-white/90">
+                    Physical Signing Terminal
+                  </h2>
+                  <span className="font-serif italic text-xs text-white/45">§ 2.2</span>
+                </div>
+                <p className="text-xs text-white/60 mt-0.5">
+                  ESP32 hardware station twin
+                </p>
               </div>
-              <span className="text-xs font-mono font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
+              <span className="text-[10px] font-mono text-white/45 uppercase tracking-widest">
                 SSD1306 128x64
               </span>
             </div>
 
-            {/* ═══ 128x64 SSD1306 OLED SCREEN (PHYSICAL HARDWARE HOUSING) ═══ */}
+            {/* ═══ 128x64 SSD1306 OLED SCREEN (OPAQUE BG-ZINC-950 HARDWARE INSET) ═══ */}
             <div className="mb-6">
-              <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-5 oled-screen-housing relative overflow-hidden font-mono min-h-[148px] flex flex-col justify-between">
+              <div className="bg-zinc-950 border border-zinc-800 rounded-[8px] p-5 font-mono min-h-[154px] flex flex-col justify-between text-emerald-400 relative overflow-hidden select-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
                 {/* Header bar on OLED */}
-                <div className="flex justify-between items-center text-[10px] text-emerald-400/70 border-b border-emerald-950/80 pb-1.5 mb-2">
+                <div className="flex justify-between items-center text-[10px] text-emerald-500/80 border-b border-emerald-950 pb-1.5 mb-2">
                   <span>BASTION HW SIGNER v2</span>
                   <span>PAGE {store.oledPage}/3</span>
                 </div>
@@ -152,13 +163,13 @@ export const ApprovalsView: React.FC = () => {
                 <div className="flex-1 flex flex-col justify-center py-1">
                   {store.oledPage === 1 && (
                     <div className="space-y-1">
-                      <div className="text-[11px] text-emerald-400 font-bold tracking-wider">
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
                         AMOUNT REVIEW:
                       </div>
-                      <div className="text-xl font-bold text-emerald-300 tracking-wide drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]">
+                      <div className="text-2xl font-bold text-emerald-300 tracking-wide tabular-nums">
                         {approval ? `$${approval.amountUsdc.toFixed(2)} USDC` : '$50.00 USDC'}
                       </div>
-                      <div className="text-[10px] text-emerald-500/80">
+                      <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
                         POLICY: EXCEEDS $25 AUTONOMOUS
                       </div>
                     </div>
@@ -166,13 +177,13 @@ export const ApprovalsView: React.FC = () => {
 
                   {store.oledPage === 2 && (
                     <div className="space-y-1">
-                      <div className="text-[11px] text-emerald-400 font-bold tracking-wider">
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
                         RECIPIENT REVIEW:
                       </div>
-                      <div className="text-xs font-bold text-emerald-300 break-all leading-relaxed">
+                      <div className="text-[11px] font-bold text-emerald-300 break-all leading-tight">
                         {approval?.recipientAddress || '0xABCD000000000000000000000000000000001234'}
                       </div>
-                      <div className="text-[10px] text-emerald-500/80">
+                      <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
                         LABEL: {approval?.merchantName || 'Verified Demo Cloud'}
                       </div>
                     </div>
@@ -180,13 +191,13 @@ export const ApprovalsView: React.FC = () => {
 
                   {store.oledPage === 3 && (
                     <div className="space-y-1">
-                      <div className="text-[11px] text-emerald-400 font-bold tracking-wider">
-                        CALLLDATA DIGEST:
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                        CALLDATA DIGEST:
                       </div>
-                      <div className="text-[10px] text-emerald-300 break-all leading-normal font-mono">
+                      <div className="text-[10px] text-emerald-300 break-all leading-tight font-mono">
                         {approval?.calldataDigest.slice(0, 36) || '0x22F100000000000000000000000000000000'}...
                       </div>
-                      <div className="text-[10px] text-emerald-400 font-semibold mt-1">
+                      <div className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-1">
                         TAP RFID &gt; PRESS GPIO 33
                       </div>
                     </div>
@@ -194,99 +205,91 @@ export const ApprovalsView: React.FC = () => {
                 </div>
 
                 {/* Footer status on OLED */}
-                <div className="flex justify-between items-center text-[9px] text-emerald-600/70 border-t border-emerald-950/80 pt-1.5 mt-2">
+                <div className="flex justify-between items-center text-[9px] text-emerald-600 border-t border-emerald-950 pt-1.5 mt-2">
                   <span>RFID: {store.rfidState.replace('_', ' ')}</span>
                   <span>{store.gpio33Approve ? 'SIG_READY' : 'WAITING_BTN'}</span>
                 </div>
               </div>
 
               {/* Prev / Next Page Buttons */}
-              <div className="flex items-center justify-between mt-3 px-1">
-                <div className="flex gap-1.5">
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex gap-2">
                   {[1, 2, 3].map((page) => (
                     <button
                       key={page}
                       onClick={() => store.setOledPage(page as 1 | 2 | 3)}
-                      className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
+                      className={`px-3 py-1 text-[11px] font-mono transition-all rounded-[8px] cursor-pointer ${
                         store.oledPage === page
-                          ? 'bg-slate-900 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                          ? 'glass-btn-primary font-bold shadow-sm'
+                          : 'glass-btn text-white/70'
                       }`}
                     >
-                      Page {page}
+                      P0{page}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex items-center gap-1 text-xs">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => store.setOledPage(store.oledPage > 1 ? (store.oledPage - 1 as 1 | 2 | 3) : 3)}
-                    className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition-colors"
-                    title="Previous page"
+                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer"
                   >
-                    <ChevronLeft size={14} />
+                    ← PREV
                   </button>
                   <button
                     onClick={() => store.setOledPage(store.oledPage < 3 ? (store.oledPage + 1 as 1 | 2 | 3) : 1)}
-                    className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition-colors"
-                    title="Next page"
+                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer"
                   >
-                    <ChevronRight size={14} />
+                    NEXT →
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* ═══ HARDWARE STATUS STRIP: RFID & GPIO BUTTONS ═══ */}
-            <div className="space-y-4 pt-4 border-t border-slate-100">
+            {/* ═══ RFID & GPIO HARDWARE KEYS ═══ */}
+            <div className="space-y-4 pt-4 border-t border-white/[0.08]">
               {/* RC522 RFID Reader */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                    <CreditCard size={14} className="text-slate-400" />
-                    <span>RC522 RFID Reader</span>
-                  </div>
-                  <span
-                    className={`text-xs font-mono px-2.5 py-0.5 rounded-full font-medium ${
-                      store.rfidState === 'CARD_2_SENIOR'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                        : store.rfidState === 'CARD_1_JUNIOR'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                        : 'bg-slate-100 text-slate-500 border border-slate-200/60'
-                    }`}
-                  >
-                    {store.rfidState === 'NO_CARD' ? 'No Card' : store.rfidState === 'CARD_1_JUNIOR' ? 'Card 1 (Junior Tier)' : 'Card 2 (Senior Tier)'}
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                    RC522 RFID Authorization Tier
                   </span>
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] text-white/90">
+                    <span className="w-1.5 h-1.5 rounded-none bg-emerald-400 inline-block" />
+                    <span className="uppercase tracking-wider font-bold">
+                      {store.rfidState === 'NO_CARD' ? 'NO CARD' : store.rfidState === 'CARD_1_JUNIOR' ? 'CARD 1 (JUNIOR)' : 'CARD 2 (SENIOR)'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* RFID Selector Pills */}
+                {/* RFID Selector Keys */}
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => store.setRfidState('NO_CARD')}
-                    className={`py-1.5 px-2 rounded-xl text-xs font-medium transition-all ${
+                    className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'NO_CARD'
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                        ? 'glass-btn-primary font-bold'
+                        : 'glass-btn text-white/70'
                     }`}
                   >
-                    Remove Card
+                    Eject Card
                   </button>
                   <button
                     onClick={() => store.setRfidState('CARD_1_JUNIOR')}
-                    className={`py-1.5 px-2 rounded-xl text-xs font-medium transition-all ${
+                    className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'CARD_1_JUNIOR'
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                        ? 'glass-btn-primary font-bold'
+                        : 'glass-btn text-white/70'
                     }`}
                   >
                     Tap Card 1
                   </button>
                   <button
                     onClick={() => store.setRfidState('CARD_2_SENIOR')}
-                    className={`py-1.5 px-2 rounded-xl text-xs font-medium transition-all ${
+                    className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'CARD_2_SENIOR'
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                        ? 'glass-btn-primary font-bold'
+                        : 'glass-btn text-white/70'
                     }`}
                   >
                     Tap Card 2
@@ -294,42 +297,39 @@ export const ApprovalsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* GPIO Buttons */}
+              {/* GPIO Tactile Buttons */}
               <div className="space-y-2 pt-2">
-                <div className="text-xs font-medium text-slate-500 mb-1">
-                  Physical Tactile Switches
+                <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium mb-1">
+                  Physical Tactile Key Switches
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {/* GPIO 33 Approve */}
+                  {/* GPIO 33 Approve: Tinted Emerald Glass */}
                   <button
                     onClick={handleApprove}
                     disabled={!approval}
-                    className="py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:pointer-events-none text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+                    className="glass-status-emerald py-3 px-3 rounded-[8px] disabled:opacity-30 disabled:pointer-events-none text-emerald-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
                   >
-                    <CheckCircle size={15} />
-                    <span>GPIO 33: Approve</span>
+                    GPIO 33: Approve
                   </button>
 
-                  {/* GPIO 32 Panic */}
+                  {/* GPIO 32 Panic: Tinted Crimson Glass */}
                   <button
                     onClick={handlePanic}
-                    className="py-3 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+                    className="glass-status-crimson py-3 px-3 rounded-[8px] text-rose-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
                   >
-                    <AlertOctagon size={15} />
-                    <span>GPIO 32: Panic</span>
+                    GPIO 32: Panic
                   </button>
                 </div>
               </div>
 
               {/* Generated secp256k1 Signature Hex */}
               {store.deviceSignature && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
-                  <div className="text-[11px] text-emerald-700 font-medium mb-1 flex items-center gap-1.5">
-                    <CheckCircle size={13} />
-                    <span>Generated secp256k1 Hardware Signature:</span>
+                <div className="glass-well p-3 space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-emerald-300 font-bold">
+                    Generated secp256k1 Hardware Signature:
                   </div>
-                  <div className="font-mono text-[10px] text-slate-700 break-all bg-white p-2 rounded-lg border border-slate-200">
+                  <div className="font-mono text-[10px] text-white/80 break-all">
                     {store.deviceSignature}
                   </div>
                 </div>
