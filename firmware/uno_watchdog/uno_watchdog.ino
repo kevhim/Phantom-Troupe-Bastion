@@ -1,8 +1,8 @@
 /**
- * BASTION X v2.3 — High-Tech OLED Dashboard for Arduino Uno
+ * BASTION X — Simple Test: Display "HI" on OLED
  * Host: Laptop A (NVIDIA RTX 5060)
  *
- * Wiring (4 Pins):
+ * Wiring (4 Pins to Arduino Uno):
  * - GND      --> Arduino GND
  * - VDD/VCC  --> Arduino 5V (or 3.3V)
  * - SCK/SCL  --> Arduino Pin A5
@@ -20,75 +20,45 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-int animStep = 0;
-unsigned long lastUpdate = 0;
-int uptimeSec = 0;
-
-void drawBastionDisplay() {
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-
-    // 1. Sleek Outer Border Box
-    display.drawRoundRect(0, 0, 128, 64, 4, SSD1306_WHITE);
-
-    // 2. Bold Brand Header: BASTION X
-    display.setTextSize(2);
-    display.setCursor(11, 6);
-    display.print(F("BASTION X"));
-
-    // 3. Horizontal Separator Bar
-    display.drawFastHLine(4, 25, 120, SSD1306_WHITE);
-
-    // 4. Subtitle & Mode
-    display.setTextSize(1);
-    display.setCursor(8, 30);
-    display.print(F("AI WALLET DEFENSE"));
-
-    // 5. System Status & Node
-    display.setCursor(8, 41);
-    display.print(F("SYS: ONLINE [5060]"));
-
-    // 6. Dynamic Moving Radar Bar at Bottom
-    int barWidth = (uptimeSec % 16) * 7;
-    if (barWidth > 112) barWidth = 112;
-    display.drawRect(7, 52, 114, 6, SSD1306_WHITE);
-    display.fillRect(8, 53, barWidth, 4, SSD1306_WHITE);
-
-    display.display();
-}
-
 void setup() {
     Serial.begin(9600);
     pinMode(13, OUTPUT);
+    digitalWrite(13, HIGH);
 
-    // Initialize I2C OLED display at 0x3C
+    // 1. Initialize I2C communication and OLED display
     Wire.begin();
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-        Serial.println(F("SSD1306 Allocation Failed!"));
-        for(;;); // Halt if not found
+        Serial.println(F("OLED init failed! Check A4/A5 wiring."));
+        for (;;);
     }
 
-    Serial.println(F("SSD1306 Initialized Successfully!"));
-    drawBastionDisplay();
+    // 2. Clear previous screen contents
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+
+    // 3. Draw a sleek outer border box
+    display.drawRoundRect(0, 0, 128, 64, 4, SSD1306_WHITE);
+
+    // 4. Print giant "HI" centered (Size 4 = 24x32 pixels per letter)
+    display.setTextSize(4);
+    display.setCursor(42, 10);
+    display.print(F("HI"));
+
+    // 5. Print "BASTION X" centered underneath
+    display.setTextSize(1);
+    display.setCursor(35, 48);
+    display.print(F("BASTION X"));
+
+    // 6. Push buffer to physical OLED screen
+    display.display();
+
+    Serial.println(F("Displaying 'HI' on OLED successfully!"));
 }
 
 void loop() {
-    unsigned long now = millis();
-
-    // Refresh animation and heartbeat every second
-    if (now - lastUpdate >= 1000) {
-        lastUpdate = now;
-        uptimeSec++;
-
-        // Blink Pin 13 LED
-        digitalWrite(13, (uptimeSec % 2 == 0) ? HIGH : LOW);
-
-        // Update OLED screen
-        drawBastionDisplay();
-
-        // Send telemetry beacon to Laptop A backend
-        Serial.print(F("{\"node\":\"uno_watchdog\",\"status\":\"ONLINE\",\"uptime\":"));
-        Serial.print(uptimeSec);
-        Serial.println(F("}"));
-    }
+    // Pulse built-in Pin 13 LED as heartbeat
+    digitalWrite(13, HIGH);
+    delay(500);
+    digitalWrite(13, LOW);
+    delay(500);
 }
