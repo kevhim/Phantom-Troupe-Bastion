@@ -74,7 +74,7 @@
 4. `GatewayAndCOMOwnership` serial owner and safety.
 5. `OLEDPagePreview` clearly labeled replica only.
 6. `TelemetryAndHeartbeats` confidence and delay.
-7. `ESP8266AlarmPanel` remote alert state.
+7. `Uno1BuzzerAndEnvironmentPanel` 5V active buzzer D8 state and environmental/presence telemetry (migrated from decommissioned 16x2 LCD).
 8. `SelfTestConsole` nonfinancial tests only; prohibit remote synthetic button presses.
 
 ### /evidence — Forensic and Contract Evidence (7)

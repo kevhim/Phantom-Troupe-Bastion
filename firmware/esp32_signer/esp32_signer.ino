@@ -1,8 +1,8 @@
 /**
- * BASTION X v2.1 — ESP32 #1 Physical Transaction Signer Firmware
+ * BASTION X v2.3 — ESP32 #1 Physical Transaction Signer Firmware
  * Hardware-Assisted Out-of-Policy Review & Independent Panic Revocation
  *
- * Direct Hardware Wiring (Laptop B):
+ * Direct Hardware Wiring (Laptop B - Intel Core Ultra 7 155H):
  * - RC522 RFID: SCK GPIO18, MISO GPIO19, MOSI GPIO23, SS GPIO5, RST GPIO27 (3.3V SPI)
  * - SSD1306 OLED #1: SDA GPIO21, SCL GPIO22 (3.3V I2C, 0x3C)
  * - Button #1 (PANIC): GPIO32 -> Button -> GND (INPUT_PULLUP)
@@ -10,10 +10,13 @@
  * - Wi-Fi: On-board 802.11b/g/n for independent direct RPC revocation broadcast
  *
  * Security Invariants:
- * 1. Signs ONLY the exact canonical EIP-712 PaymentIntent reviewed on OLED.
- * 2. Private signing keys never leave device flash/memory.
- * 3. Panic button aborts signing instantly and initiates on-chain revocation directly.
- * 4. RFID UID indicates role tier (Junior/Senior); does not prove cryptographic identity.
+ * 1. Signs ONLY following complete 4-page paginated OLED review, RFID scan, and sustained physical button press.
+ * 2. Reject signing immediately if trusted OLED #1 display is unavailable or malfunctions.
+ * 3. Shows full decoded recipient address across pages, amount, token, target contract, function selector,
+ *    chain ID, nonce, expiry, and transaction fingerprint.
+ * 4. Private signing keys never leave device flash/memory.
+ * 5. Panic button aborts signing instantly and initiates on-chain revocation directly.
+ * 6. RFID UID indicates role tier (Junior/Senior); does not prove cryptographic identity.
  */
 
 #include <Arduino.h>
@@ -31,6 +34,7 @@
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool displayHealthy = false;
 
 // Pin Definitions matching HARDWARE_MAP.md
 #define PIN_RC522_SS   5
@@ -47,12 +51,12 @@ const String SENIOR_CARD_UID = "E5F6G7H8"; // Senior Card
 // Device Security States
 enum SignerState {
     STATE_IDLE,
-    STATE_REVIEW_PAGE1,     // Intent ID, Token, Amount
-    STATE_REVIEW_PAGE2,     // Recipient Address (Line 1 & 2)
-    STATE_REVIEW_PAGE3,     // Target & Selector
-    STATE_REVIEW_PAGE4,     // Chain ID, Nonce, Expiry
+    STATE_REVIEW_PAGE1,     // Intent ID, Token, Amount, Fingerprint
+    STATE_REVIEW_PAGE2,     // Full Recipient Address (Paginated lines 1 & 2)
+    STATE_REVIEW_PAGE3,     // Target Contract, Function & Selector
+    STATE_REVIEW_PAGE4,     // Chain ID, Nonce, Expiry, Fingerprint
     STATE_AWAITING_RFID,    // Role Tier selection
-    STATE_AWAITING_APPROVE, // Physical GPIO33 confirmation
+    STATE_AWAITING_APPROVE, // Physical sustained GPIO33 confirmation
     STATE_SIGNED,
     STATE_PANIC_LOCKED,
     STATE_REVOKING_ONCHAIN,
@@ -91,15 +95,18 @@ const char* DIRECT_RPC_URL = "http://192.168.1.100:8545"; // Direct Anvil / RPC 
 
 void setupDisplay() {
     if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-        Serial.println(F("OLED init failed"));
-        for (;;);
+        displayHealthy = false;
+        Serial.println(F("{\"error\":\"OLED_INIT_FAILED\",\"message\":\"Trusted OLED #1 display unavailable or malfunctioning. Signing rejected.\"}"));
+        return;
     }
+    displayHealthy = true;
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
     display.setCursor(0, 0);
-    display.println(F("BASTION X v2.1"));
+    display.println(F("BASTION X v2.3"));
     display.println(F("Hardware Signer #1"));
+    display.println(F("Trusted OLED #1: OK"));
     display.println(F("Status: READY"));
     display.display();
 }
@@ -113,10 +120,15 @@ void setup() {
     pinMode(PIN_BUTTON_APPROVE, INPUT_PULLUP);
 
     setupDisplay();
-    Serial.println(F("ESP32 Signer initialized. GPIO32=PANIC, GPIO33=APPROVE"));
+    if (displayHealthy) {
+        Serial.println(F("{\"status\":\"READY\",\"node\":\"esp32_signer\",\"display\":\"OLED_1_OK\",\"panic_pin\":32,\"approve_pin\":33}"));
+    } else {
+        Serial.println(F("{\"status\":\"DEGRADED\",\"node\":\"esp32_signer\",\"display\":\"MALFUNCTION\",\"signing_locked\":true}"));
+    }
 }
 
 void renderPage(const char* title, const char* line1, const char* line2, const char* line3, const char* line4) {
+    if (!displayHealthy) return;
     display.clearDisplay();
     display.setCursor(0, 0);
     display.print(F("--- "));
@@ -169,6 +181,12 @@ void loop() {
         }
     }
 
+    // Reject signing if the trusted display is unavailable or malfunctions
+    if (!displayHealthy && currentState != STATE_IDLE && currentState != STATE_PANIC_LOCKED) {
+        currentState = STATE_IDLE;
+        Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted OLED #1 is unavailable or malfunctioning.\"}"));
+    }
+
     // 2. State Machine Handling
     switch (currentState) {
         case STATE_IDLE:
@@ -176,11 +194,19 @@ void loop() {
             if (Serial.available()) {
                 String cmd = Serial.readStringUntil('\n');
                 if (cmd.startsWith("INTENT:")) {
-                    // Populate currentIntent (example fields)
+                    if (!displayHealthy) {
+                        Serial.println(F("{\"error\":\"DISPLAY_UNAVAILABLE\",\"message\":\"Signing rejected: Trusted OLED #1 is unavailable or malfunctioning.\"}"));
+                        return;
+                    }
+                    // Populate currentIntent (example canonical fields)
                     currentIntent.chainId = 31337;
                     currentIntent.amountBaseUnits = 250000000; // 250 bUSD
                     strncpy(currentIntent.recipientAddress, "0x00000000000000000000000000000000000000cc", 42);
+                    strncpy(currentIntent.targetContract, "0x00000000000000000000000000000000000000aa", 42);
+                    strncpy(currentIntent.functionSelector, "0xa9059cbb", 10);
                     strncpy(currentIntent.shortFingerprint, "a7f4bc89", 8);
+                    currentIntent.accountNonce = 1;
+                    currentIntent.deadline = 300; // +300s
                     reviewStartTime = millis();
                     currentState = STATE_REVIEW_PAGE1;
                 }
@@ -188,6 +214,12 @@ void loop() {
             break;
 
         case STATE_REVIEW_PAGE1:
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
+            // Page 1: Token, Amount, Transaction Fingerprint
             renderPage("REVIEW 1/4: AMOUNT", "Token: bUSD (6 dec)", "Amount: 250.00 bUSD", "FP: a7f4bc89", "Press APPROVE ->");
             if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
                 delay(200);
@@ -196,7 +228,13 @@ void loop() {
             break;
 
         case STATE_REVIEW_PAGE2:
-            renderPage("REVIEW 2/4: RECIPIENT", "Recip [1-20]:", "0x000000000000000000", "Recip [21-42]:", "0000000000000000cc");
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
+            // Page 2: Full Recipient Address through readable pagination (Lines 1 & 2 covering all 42 characters)
+            renderPage("REVIEW 2/4: RECIP", "Recip [1-21]:", "0x0000000000000000000", "Recip [22-42]:", "000000000000000000cc");
             if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
                 delay(200);
                 currentState = STATE_REVIEW_PAGE3;
@@ -204,6 +242,12 @@ void loop() {
             break;
 
         case STATE_REVIEW_PAGE3:
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
+            // Page 3: Target Contract, Function & Selector
             renderPage("REVIEW 3/4: TARGET", "Target: MockToken", "Func: transfer()", "Selector: 0xa9059cbb", "Press APPROVE ->");
             if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
                 delay(200);
@@ -212,11 +256,22 @@ void loop() {
             break;
 
         case STATE_REVIEW_PAGE4:
-            renderPage("REVIEW 4/4: CHAIN", "Chain ID: 31337", "Nonce: 1", "Expiry: +300s", "Scan RFID Card...");
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
+            // Page 4: Chain ID, Nonce, Expiry, Fingerprint
+            renderPage("REVIEW 4/4: CHAIN", "Chain ID: 31337", "Nonce: 1 | Exp: +300s", "FP: a7f4bc89", "Scan RFID Card...");
             currentState = STATE_AWAITING_RFID;
             break;
 
         case STATE_AWAITING_RFID:
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
             if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
                 String uid = "";
                 for (byte i = 0; i < rfid.uid.size; i++) {
@@ -243,10 +298,15 @@ void loop() {
             break;
 
         case STATE_AWAITING_APPROVE: {
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
             String roleLine = "Role: " + scannedRole;
-            renderPage("CONFIRM SIGNING", roleLine.c_str(), "Hold APPROVE 1s", "Panic to cancel", "");
+            renderPage("CONFIRM SIGNING", roleLine.c_str(), "Hold APPROVE >=1s", "Panic (32) to abort", "");
             if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
-                delay(1000); // Require 1-second sustained press
+                delay(1000); // Require 1-second sustained physical press
                 if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
                     currentState = STATE_SIGNED;
                 }
@@ -255,6 +315,11 @@ void loop() {
         }
 
         case STATE_SIGNED:
+            if (!displayHealthy) {
+                currentState = STATE_IDLE;
+                Serial.println(F("{\"error\":\"DISPLAY_MALFUNCTION\",\"message\":\"Signing rejected: Trusted display unavailable.\"}"));
+                break;
+            }
             renderPage("DEVICE SIGNED", "EIP-712 Sig Created", "Low-s canonical", "Emitted to Host", "");
             Serial.println(F("DEVICE_SIGNATURE:0x3333333333333333333333333333333333333333333333333333333333333333"));
             delay(3000);

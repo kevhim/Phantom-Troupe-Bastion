@@ -19,7 +19,7 @@ The agent can autonomously pay approved vendors using a restricted ERC-4337 sess
 
 ## DECISIONS ABOUT FIVE PROPOSED UPGRADES
 1. **On-device signing (ACCEPT with conditions).** Private exception signer is provisioned and used **on ESP32 #1**, not on laptop A or its backend. ESP32's ordinary flash is **not an audited secure element**. Determine variant and provisioning; secure boot/flash encryption optional later after recovery planning. Restrict on-chain authority of this signer so theft cannot grant unlimited spending. Owner/admin root signing remains on independently managed owner wallet, never on the AI host.
-2. **Independent review (ACCEPT, rewire).** At least one 3.3V OLED connects **directly to ESP32 #1** and receives the same canonical operation used for signing. Show full address across pages, amount/token/contract/function/chain, operation fingerprint, expiration; never trust text supplied solely by laptop A. LCD on Uno#1 is status-only unless made an equally independent trusted device.
+2. **Independent review (ACCEPT, rewire).** At least one 3.3V OLED connects **directly to ESP32 #1** and receives the same canonical operation used for signing. Show full address across pages, amount/token/contract/function/chain, operation fingerprint, expiration; never trust text supplied solely by laptop A. The 16x2 I2C LCD on Uno #1 is decommissioned; environmental monitoring and presence telemetry are moved directly to the React dashboard pages. Signing is rejected if the trusted OLED display is unavailable.
 3. **Junior/Senior roles (ACCEPT as demonstration tiers).** Card 1 selects JUNIOR review and card 2 SENIOR review. RC522 UID is clonable and not strong user authentication. Contract must enforce cryptographic approval authority, low/high value caps, and independent owner signature for high-tier changes/payments. Never claim UID is a secure cryptographic factor.
 4. **Panic channel (ACCEPT with independent RPC on Laptop B).** ESP32 #1 can sign/send `revokeSession` through independent direct JSON-RPC to the local Anvil node hosted on Laptop B using its **revocation-only** role/key with funded gas. This bypasses Laptop A application software and guarantees revocation even if Laptop A is powered off. Revocation effective only when on-chain confirmed.
 5. **Mirage mode (STRETCH).** Synthetic isolated records and token fixtures only. Never redirect legitimate blockchain calls to a "fake chain" without a visible simulation label for judges; never claim this prevents violence or coercion. Quiet remote alert is possible; a buzzer is not secret when audible nearby. Trigger chain revocation separately.
@@ -58,8 +58,8 @@ S11. No two laptop processes own the same serial device; avoid connecting unrela
   - Arduino UNO Q 4GB via USB-C (Linux edge coordinator service & gateway telemetry)
   - Arduino Uno #1 via USB:
     - **5V Active Buzzer on Pin D8** (Signal / +), GND to common rail
-    - 16x2 I2C LCD (A4 SDA, A5 SCL)
     - Optional sensors: PIR (D2), DHT11 (D4), SG90 Servo (D6)
+    - *(16x2 I2C LCD decommissioned in v2.3; environmental monitoring moved to React console)*
 - Software Services:
   - **Local Anvil Blockchain Node (:8545, Chain ID 31337)**
   - Compatible ERC-4337 Bundler Service
@@ -79,7 +79,7 @@ S11. No two laptop processes own the same serial device; avoid connecting unrela
 - `services/gateway`: B-only UART ownership for classic Uno; records observed telemetry; never creates `HARDWARE_APPROVED` events on behalf of ESP32.
 - `services/edge-q`: UNO Q Linux telemetry/status and health; no ultimate financial authority.
 - `firmware/esp32_signer`: directly connected signer input/display, signed typed message generation, revocation RPC, provisioned keys, audit receipts.
-- `firmware/uno_operator`: 5V Active Buzzer (Pin D8), status LCD, and optional PIR/DHT sensors.
+- `firmware/uno_operator`: 5V Active Buzzer (Pin D8), and optional PIR/DHT sensors (16x2 LCD decommissioned; telemetry streamed to React dashboard).
 - `firmware/uno_supervisor`: optional independent watchdog; no essential authorization pin ownership.
 - `firmware/esp8266_alert`: [ARCHIVED in v2.3] Replaced by Uno #1 Pin D8 buzzer on Laptop B.
 - `contracts`: ERC-4337 account; policy, exception tiering, distinct roles, on-chain revocation, mock ERC-20/vendor, Foundry tests.

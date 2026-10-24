@@ -71,7 +71,7 @@ class HardwareHealthManager:
             "panic_button": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "GPIO32 Physical Panic Button"},
             "gateway_b": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Laptop B Hardware Serial Gateway"},
             "uno_q_edge": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Arduino UNO Q 4GB Linux Edge Security Node"},
-            "uno_sensors": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Arduino Uno #1 (Status LCD & Diagnostics)"},
+            "uno_sensors": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Arduino Uno #1 (Environmental Sensors & Buzzer D8)"},
             "uno_buzzer": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "5V Active Buzzer on Arduino Uno #1 (Pin D8)"},
             "blockchain_node": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Local Anvil Blockchain & Bundler (Port 8545)"},
 

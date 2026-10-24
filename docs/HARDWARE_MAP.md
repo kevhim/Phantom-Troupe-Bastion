@@ -4,7 +4,7 @@
 | Node | Location | Electrical / Physical Connections | Software & Security Responsibilities |
 |---|---|---|---|
 | **Laptop A**<br>(RTX 5060, 32GB RAM) | Main Application & Operator Host | • Built-in / Owned Webcam<br>• ESP32 #2 via USB (OLED #2 on GPIO21/22)<br>• Arduino Uno #2 via USB (Watchdog) | • React 18 Web Console (:5173)<br>• FastAPI Backend (:8000)<br>• AI Purchasing Agent<br>• OpenCV Vision Pipeline<br>• SQLite App DB & Mirage Sandbox<br>• **NO SIGNING KEYS STORED HERE** |
-| **Laptop B**<br>(Intel Core Ultra 7 155H, 32GB RAM) | Trusted Authorization & Security Station | • ESP32 #1 Dedicated Signer via USB<br>  - RC522 RFID (SPI: 18/19/23/5/27)<br>  - OLED #1 Trusted Review (I2C: 21/22)<br>  - Approval Button (GPIO33, sustained)<br>  - Panic Button (GPIO32, interrupt)<br>• Arduino UNO Q 4GB via USB-C<br>• Arduino Uno #1 via USB<br>  - **5V Active Buzzer (Pin D8)**<br>  - 16x2 I2C LCD (A4/A5)<br>  - Opt. PIR D2, DHT11 D4, Servo D6 | • **Local Anvil Blockchain (:8545, Chain 31337)**<br>• Compatible ERC-4337 Bundler<br>• Supervisor Auth Service (:8010)<br>• Serial Hardware Gateway<br>• UNO Q Edge Coordinator<br>• Independent Audit Storage (`C:\bastion_audit_checkpoints`) |
+| **Laptop B**<br>(Intel Core Ultra 7 155H, 32GB RAM) | Trusted Authorization & Security Station | • ESP32 #1 Dedicated Signer via USB<br>  - RC522 RFID (SPI: 18/19/23/5/27)<br>  - OLED #1 Trusted Review (I2C: 21/22)<br>  - Approval Button (GPIO33, sustained)<br>  - Panic Button (GPIO32, interrupt)<br>• Arduino UNO Q 4GB via USB-C<br>• Arduino Uno #1 via USB<br>  - **5V Active Buzzer (Pin D8)**<br>  - Opt. PIR D2, DHT11 D4, Servo D6 | • **Local Anvil Blockchain (:8545, Chain 31337)**<br>• Compatible ERC-4337 Bundler<br>• Supervisor Auth Service (:8010)<br>• Serial Hardware Gateway<br>• UNO Q Edge Coordinator<br>• Independent Audit Storage (`C:\bastion_audit_checkpoints`) |
 | **Laptop C**<br>(RTX 4060) | Cold / Hot Standby Node | • Zero mandatory hardware connected | • Hot-standby Anvil RPC mirror<br>• Emergency compute or test runner |
 
 **Security Architecture Rules:**
@@ -12,6 +12,7 @@
 2. Laptop A's ESP32 #2 and Arduino Uno #2 are strictly unprivileged and CANNOT authorize transactions.
 3. The local Anvil blockchain runs on Laptop B, ensuring emergency revocation broadcast directly succeeds even if Laptop A is powered down.
 4. **v2.3 Buzzer Architecture:** The non-functional ESP8266 has been decommissioned. The 5V active buzzer is connected directly to **Arduino Uno #1 Digital Pin D8** on Laptop B. The alarm now depends on the Intel supervisor/Uno #1 local serial path and no longer provides independent wireless notification.
+5. **v2.3 Display Architecture:** The 16x2 I2C LCD has been decommissioned from all required hardware configurations. Environmental monitoring, physical presence, RFID status, and hardware health are streamed directly to the React security console. OLED #1 on ESP32 #1 is the sole trusted physical review screen; OLED #2 on ESP32 #2 is strictly for operator telemetry and cannot approve transactions. Reject signing if OLED #1 is unavailable or malfunctions.
 
 ---
 
@@ -31,14 +32,16 @@
 
 ---
 
-## Arduino Uno #1 Status & 5V Active Buzzer Node (Laptop B)
+## Arduino Uno #1 Environmental & 5V Active Buzzer Node (Laptop B)
 | Peripheral | Pin | Logic Level | Purpose |
 |---|---|---|---|
 | **Active Buzzer** | **D8** | 5V Output | Physical audio alarm actuation (Active HIGH) driven by Laptop B Supervisor |
-| **16x2 I2C LCD** | **A4 (SDA), A5 (SCL)** | 5V I2C | Local desk status (0x27 or 0x3F); secondary status only |
-| **Optional PIR Sensor** | **D2** | 5V Input | Optical motion observation (auxiliary telemetry) |
-| **Optional DHT11 Sensor** | **D4** | 5V Digital | Ambient temperature and humidity context |
+| **Optional PIR Sensor** | **D2** | 5V Input | Optical motion observation (auxiliary telemetry forwarded to React UI) |
+| **Optional DHT11 Sensor** | **D4** | 5V Digital | Ambient temperature and humidity context (forwarded to React UI) |
 | **Optional SG90 Servo** | **D6 (PWM)** | 5V PWM | Mechanical demonstration flag (if verified) |
+
+> [!NOTE]
+> **Decommissioned:** The 16x2 I2C LCD (previously on A4/A5) has been removed from all required hardware configurations. Environmental and status monitoring is displayed on the React security console.
 
 ---
 
