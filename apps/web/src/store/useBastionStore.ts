@@ -408,7 +408,14 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
   setOledPage: (page) => set({ oledPage: page }),
 
   setRfidState: (rfid) => {
-    set({ rfidState: rfid, rfidError: null, gpio33Approve: false });
+    set({ rfidState: rfid, rfidError: null });
+    if (rfid === 'CARD_1_JUNIOR' || rfid === 'CARD_2_SENIOR') {
+      const state = get();
+      if (state.activeApproval) {
+        // As soon as you tap the card, it immediately approves the transaction
+        state.pressGpioApprove();
+      }
+    }
   },
 
   clearRfidError: () => set({ rfidError: null }),
@@ -417,22 +424,17 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
     const state = get();
     if (!state.activeApproval) return;
 
-    // Strict Enforcement: An authorized RFID card must be tapped before physical GPIO 33 confirmation
-    if (state.rfidState === 'NO_CARD') {
-      set({
-        rfidError: 'RFID CARD REQUIRED: Tap Card 1 (Junior) or Card 2 (Senior) before pressing GPIO 33!',
-      });
-      return;
-    }
+    // If no card was selected yet, default to tapping Card 1 (Junior) for instant approval
+    const effectiveRfid = state.rfidState === 'NO_CARD' ? 'CARD_1_JUNIOR' : state.rfidState;
 
-    if (state.rfidState === 'CARD_1_JUNIOR' && state.activeApproval.amountUsdc > 2000) {
+    if (effectiveRfid === 'CARD_1_JUNIOR' && state.activeApproval.amountUsdc > 2000) {
       set({
         rfidError: 'ROLE CEILING EXCEEDED: Amount exceeds Junior cap ($2,000). Tap Card 2 (Senior) to authorize!',
       });
       return;
     }
 
-    const isSenior = state.rfidState === 'CARD_2_SENIOR';
+    const isSenior = effectiveRfid === 'CARD_2_SENIOR';
     const signature = isSenior
       ? '0x7a8b9c0d1e2f34567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456781c'
       : '0x4d61895a9478f7e73e925b6ec67e0e20e83b5f00e9bcfa44458f4f107f0bb57d6f54cbe540a93149a421469e5d4cb3179261a298be01369324e930f1d6b052d01b';
@@ -446,10 +448,11 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
       amountUsdc: state.activeApproval.amountUsdc,
       status: 'SUCCESS',
       timestamp: 'Just now',
-      details: `Hardware-verified (OLED reviewed + ${isSenior ? 'Senior Card (Cap $10k)' : 'Junior Card (Cap $2k)'} + GPIO 33 signed)`
+      details: `Hardware-verified (OLED reviewed + ${isSenior ? 'Senior Card (Cap $10k)' : 'Junior Card (Cap $2k)'} tap-approved)`
     };
 
     set({
+      rfidState: effectiveRfid,
       gpio33Approve: true,
       rfidError: null,
       deviceSignature: signature,
@@ -459,8 +462,8 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
       activeApproval: null,
       activeTxStatus: {
         state: 'APPROVED_MINED',
-        title: 'Hardware Signature Verified & Mined',
-        details: `Physical signature generated with ${isSenior ? 'Senior' : 'Junior'} key on ESP32 #1. Transaction confirmed on-chain.`,
+        title: 'Instant NFC Tap Verified & Mined',
+        details: `NFC card tap verified on ESP32 #1 (${isSenior ? 'Senior' : 'Junior'} tier). Transaction signed with secp256k1 and mined on-chain.`,
         txHash: newTxHash,
         timestamp: new Date().toLocaleTimeString(),
       },

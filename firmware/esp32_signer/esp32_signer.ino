@@ -1128,8 +1128,7 @@ void loop() {
                     }
                     scannedRole = "JUNIOR_EXCEPTION";
                     if (!loadDeviceKey("junior", activeSigningKey)) { invalidateCurrentReview("KEY_UNAVAILABLE", "Cannot load key"); break; }
-                    currentState = STATE_AWAITING_APPROVE;
-                    renderAwaitingApprove();
+                    currentState = STATE_SIGNING; // Instant approval on authorized NFC card tap
                 } else if (isSenior) {
                     if (physicalCardSeniorUID.length() == 0) {
                         physicalCardSeniorUID = String(uidBuf);
@@ -1140,8 +1139,7 @@ void loop() {
                     }
                     scannedRole = "SENIOR_EXCEPTION";
                     if (!loadDeviceKey("senior", activeSigningKey)) { invalidateCurrentReview("KEY_UNAVAILABLE", "Cannot load key"); break; }
-                    currentState = STATE_AWAITING_APPROVE;
-                    renderAwaitingApprove();
+                    currentState = STATE_SIGNING; // Instant approval on authorized NFC card tap
                 } else {
                     invalidateCurrentReview("UNKNOWN_RFID_UID", "Unauthorized RFID card UID detected");
                     break;

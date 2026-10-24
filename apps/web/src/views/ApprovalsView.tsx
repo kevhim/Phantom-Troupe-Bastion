@@ -324,20 +324,20 @@ export const ApprovalsView: React.FC = () => {
                     className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'CARD_1_JUNIOR'
                         ? 'glass-btn-primary font-bold shadow-sm'
-                        : 'glass-btn text-white/70'
+                        : 'glass-btn text-white/70 hover:border-emerald-500/50'
                     }`}
                   >
-                    Tap Card 1 (Junior)
+                    ⚡ Tap Card 1 (Junior)
                   </button>
                   <button
                     onClick={() => store.setRfidState('CARD_2_SENIOR')}
                     className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'CARD_2_SENIOR'
                         ? 'glass-btn-primary font-bold shadow-sm'
-                        : 'glass-btn text-white/70'
+                        : 'glass-btn text-white/70 hover:border-emerald-500/50'
                     }`}
                   >
-                    Tap Card 2 (Senior)
+                    ⚡ Tap Card 2 (Senior)
                   </button>
                 </div>
               </div>
@@ -346,9 +346,9 @@ export const ApprovalsView: React.FC = () => {
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium mb-1">
                   <span>Physical Tactile Key Switches</span>
-                  {approval && store.rfidState === 'NO_CARD' && (
-                    <span className="text-amber-400 font-bold lowercase italic text-[10px]">
-                      * tap card above to enable approval
+                  {approval && (
+                    <span className="text-emerald-400 font-bold lowercase italic text-[10px]">
+                      * tap card above to auto-approve & sign
                     </span>
                   )}
                 </div>
@@ -361,12 +361,10 @@ export const ApprovalsView: React.FC = () => {
                     className={`py-3 px-3 rounded-[8px] font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center ${
                       !approval
                         ? 'opacity-30 pointer-events-none glass text-white/40'
-                        : store.rfidState === 'NO_CARD'
-                        ? 'border border-amber-500/60 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
                         : 'glass-status-emerald text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-emerald-900/50'
                     }`}
                   >
-                    {store.rfidState === 'NO_CARD' ? 'GPIO 33: Tap Card First' : 'GPIO 33: Approve & Sign'}
+                    GPIO 33: Approve & Sign
                   </button>
 
                   {/* GPIO 32 Panic: Tinted Crimson Glass */}
