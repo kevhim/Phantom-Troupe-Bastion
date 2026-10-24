@@ -1,23 +1,12 @@
 /**
- * BASTION X v2.3 — Arduino Uno #2 Auxiliary Watchdog & Status OLED Firmware
- * Host Machine: Laptop A (NVIDIA RTX 5060)
+ * BASTION X v2.3 — High-Tech OLED Dashboard for Arduino Uno
+ * Host: Laptop A (NVIDIA RTX 5060)
  *
- * Hardware Wiring:
- * ┌───────────────┬─────────────────────────────────────────┐
- * │ OLED Pin      │ Arduino Uno Pin                         │
- * ├───────────────┼─────────────────────────────────────────┤
- * │ GND           │ GND                                     │
- * │ VDD / VCC     │ 5V (or 3.3V)                            │
- * │ SCK / SCL     │ A5 (or dedicated SCL pin near AREF)     │
- * │ SDA           │ A4 (or dedicated SDA pin near AREF)     │
- * └───────────────┴─────────────────────────────────────────┘
- * - Built-in LED: Pin 13 (Heartbeat blink)
- * - USB Serial:   9600 baud to Laptop A
- *
- * Security Invariants:
- * 1. Auxiliary diagnostic and status telemetry node ONLY.
- * 2. Strictly FORBIDDEN from issuing cryptographic financial approvals.
- * 3. The ERC-4337 smart wallet must NEVER trust Uno #2 as an authorization source.
+ * Wiring (4 Pins):
+ * - GND      --> Arduino GND
+ * - VDD/VCC  --> Arduino 5V (or 3.3V)
+ * - SCK/SCL  --> Arduino Pin A5
+ * - SDA      --> Arduino Pin A4
  */
 
 #include <Wire.h>
@@ -27,128 +16,79 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
-#define OLED_ADDRESS 0x3C
+#define OLED_ADDR 0x3C
 
-Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-bool oledAvailable = false;
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define PIN_LED_HEARTBEAT 13
+int animStep = 0;
+unsigned long lastUpdate = 0;
+int uptimeSec = 0;
 
-unsigned long lastHeartbeat = 0;
-bool heartbeatState = false;
-unsigned long uptimeSeconds = 0;
-String simulatedFaultMode = "NONE";
+void drawBastionDisplay() {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
 
-void updateOledDisplay() {
-    if (!oledAvailable) return;
+    // 1. Sleek Outer Border Box
+    display.drawRoundRect(0, 0, 128, 64, 4, SSD1306_WHITE);
 
-    oled.clearDisplay();
-    oled.setTextColor(SSD1306_WHITE);
+    // 2. Bold Brand Header: BASTION X
+    display.setTextSize(2);
+    display.setCursor(11, 6);
+    display.print(F("BASTION X"));
 
-    // Header banner
-    oled.setTextSize(1);
-    oled.setCursor(14, 2);
-    oled.print(F("BASTION X v2.3"));
-    oled.drawFastHLine(0, 12, 128, SSD1306_WHITE);
+    // 3. Horizontal Separator Bar
+    display.drawFastHLine(4, 25, 120, SSD1306_WHITE);
 
-    // Host Domain
-    oled.setCursor(0, 16);
-    oled.print(F("HOST: Laptop A (5060)"));
+    // 4. Subtitle & Mode
+    display.setTextSize(1);
+    display.setCursor(8, 30);
+    display.print(F("AI WALLET DEFENSE"));
 
-    // Heartbeat & Status
-    oled.setCursor(0, 27);
-    oled.print(F("WATCHDOG: "));
-    if (heartbeatState) {
-        oled.print(F("[ACTIVE] *"));
-    } else {
-        oled.print(F("[ACTIVE]  "));
-    }
+    // 5. System Status & Node
+    display.setCursor(8, 41);
+    display.print(F("SYS: ONLINE [5060]"));
 
-    // Uptime counter
-    oled.setCursor(0, 38);
-    oled.print(F("UPTIME: "));
-    oled.print(uptimeSeconds);
-    oled.print(F("s"));
+    // 6. Dynamic Moving Radar Bar at Bottom
+    int barWidth = (uptimeSec % 16) * 7;
+    if (barWidth > 112) barWidth = 112;
+    display.drawRect(7, 52, 114, 6, SSD1306_WHITE);
+    display.fillRect(8, 53, barWidth, 4, SSD1306_WHITE);
 
-    // Fault Status / Mirage Mode
-    oled.drawFastHLine(0, 49, 128, SSD1306_WHITE);
-    oled.setCursor(0, 54);
-    if (simulatedFaultMode == "NONE") {
-        oled.print(F("MODE: HONEYPOT READY"));
-    } else {
-        oled.print(F("FAULT: "));
-        oled.print(simulatedFaultMode);
-    }
-
-    oled.display();
+    display.display();
 }
 
 void setup() {
     Serial.begin(9600);
-    pinMode(PIN_LED_HEARTBEAT, OUTPUT);
-    digitalWrite(PIN_LED_HEARTBEAT, LOW);
+    pinMode(13, OUTPUT);
 
-    // Attempt to initialize OLED (Graceful probe, non-blocking if disconnected)
+    // Initialize I2C OLED display at 0x3C
     Wire.begin();
-    if (oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
-        oledAvailable = true;
-        oled.clearDisplay();
-        oled.setTextColor(SSD1306_WHITE);
-        oled.setTextSize(1);
-        oled.setCursor(14, 18);
-        oled.println(F("BASTION X v2.3"));
-        oled.setCursor(10, 32);
-        oled.println(F("WATCHDOG READY"));
-        oled.display();
-        Serial.println(F("{\"status\": \"READY\", \"node\": \"uno_watchdog\", \"oled\": \"0x3C_OK\", \"laptop\": \"A\"}"));
-    } else {
-        oledAvailable = false;
-        Serial.println(F("{\"status\": \"READY\", \"node\": \"uno_watchdog\", \"oled\": \"NOT_DETECTED\", \"laptop\": \"A\"}"));
+    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+        Serial.println(F("SSD1306 Allocation Failed!"));
+        for(;;); // Halt if not found
     }
+
+    Serial.println(F("SSD1306 Initialized Successfully!"));
+    drawBastionDisplay();
 }
 
 void loop() {
     unsigned long now = millis();
 
-    // 1. Periodic 1-second heartbeat
-    if (now - lastHeartbeat >= 1000) {
-        lastHeartbeat = now;
-        heartbeatState = !heartbeatState;
-        uptimeSeconds++;
-        digitalWrite(PIN_LED_HEARTBEAT, heartbeatState ? HIGH : LOW);
+    // Refresh animation and heartbeat every second
+    if (now - lastUpdate >= 1000) {
+        lastUpdate = now;
+        uptimeSec++;
 
-        // Update physical OLED screen
-        updateOledDisplay();
+        // Blink Pin 13 LED
+        digitalWrite(13, (uptimeSec % 2 == 0) ? HIGH : LOW);
 
-        // Output JSON telemetry over serial to Laptop A
-        Serial.print(F("{\"type\":\"watchdog_heartbeat\",\"uptime_s\":"));
-        Serial.print(uptimeSeconds);
-        Serial.print(F(",\"oled\":"));
-        Serial.print(oledAvailable ? F("true") : F("false"));
-        Serial.print(F(",\"simulated_fault\":\""));
-        Serial.print(simulatedFaultMode);
-        Serial.println(F("\"}"));
-    }
+        // Update OLED screen
+        drawBastionDisplay();
 
-    // 2. Process incoming commands from Laptop A backend/test suite
-    if (Serial.available()) {
-        String cmd = Serial.readStringUntil('\n');
-        cmd.trim();
-
-        if (cmd == "SIMULATE_FAULT_DISCONNECT") {
-            simulatedFaultMode = "DISCONNECT";
-            updateOledDisplay();
-            Serial.println(F("{\"event\": \"FAULT_INJECTED\", \"type\": \"DISCONNECT\"}"));
-        } else if (cmd == "SIMULATE_FAULT_TAMPER") {
-            simulatedFaultMode = "TAMPER";
-            updateOledDisplay();
-            Serial.println(F("{\"event\": \"FAULT_INJECTED\", \"type\": \"TAMPER\"}"));
-        } else if (cmd == "CLEAR_FAULT") {
-            simulatedFaultMode = "NONE";
-            updateOledDisplay();
-            Serial.println(F("{\"event\": \"FAULT_CLEARED\"}"));
-        } else if (cmd == "PING") {
-            Serial.println(F("{\"pong\": true, \"laptop\": \"A\", \"oled\": true}"));
-        }
+        // Send telemetry beacon to Laptop A backend
+        Serial.print(F("{\"node\":\"uno_watchdog\",\"status\":\"ONLINE\",\"uptime\":"));
+        Serial.print(uptimeSec);
+        Serial.println(F("}"));
     }
 }
