@@ -17,7 +17,7 @@
    [ ESP32 #1: RC522 SPI + OLED #1 I2C + Panic GPIO + Approve GPIO ]
            | Device-only secp256k1 exception key | revocation-only key
            | directly sends revocation to reachable chain RPC
-   [ UNO Q telemetry ]  [ Uno#1 PIR/DHT/LCD ]  [ ESP8266 buzzer ]
+   [ UNO Q telemetry ]  [ Uno#1 PIR/DHT (LCD removed) + Pin D8 Buzzer ]
            | gateway observations via Intel laptop B
          Additional owner/admin signer on B for high tier
 
@@ -30,7 +30,7 @@ v1 trusted Intel B host events and independent owner wallet for exceptions. v2 i
 ## Data planes
 - Financial authorization plane: ERC4337 smart account / EntryPoint, session keys, tiered signatures, on-chain spend counters and revocation.
 - Hardware trust plane: ESP32 real physical GPIO/SPI/OLED, signer firmware local secret, direct limited revocation RPC.
-- Monitoring/telemetry: FastAPI, UNO Q, Uno sensors, ESP8266, vision and risk state; advisory only and never final money permissions.
+- Monitoring/telemetry: FastAPI, UNO Q, Uno sensors & Pin D8 buzzer (16x2 LCD decommissioned), vision and risk state; advisory only and never final money permissions.
 - UX: React with distinct operator/supervisor/dev lab routes, honest onchain/pending/error states.
 - Persistence: local SQLite event log and projections; chain contract storage = financial truth. ESP32 stores no general ledger.
 

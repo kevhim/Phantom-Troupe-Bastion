@@ -39,14 +39,16 @@ All critical physical authorization controllers connect directly to Laptop B:
 - Connects to Laptop B via **USB-C**.
 - Runs Linux edge coordinator service monitoring gateway health and forwarding tamper alarms.
 
-### C. Arduino Uno #1 (Status, Environmental & 5V Active Buzzer Node)
+### C. Arduino Uno #1 (Environmental & 5V Active Buzzer Node)
 | Peripheral Component | Arduino Uno #1 Pin | Purpose |
 |---|---|---|
 | **5V Active Buzzer** | **D8** | Physical audio security alarm actuation (Active HIGH) |
-| **16x2 I2C LCD** | **A4 (SDA), A5 (SCL)** | Local node status display (0x27 or 0x3F) |
-| **Optional PIR Sensor** | **D2** | Optical motion detection (non-critical) |
-| **Optional DHT11 Sensor** | **D4** | Temperature / humidity telemetry |
+| **Optional PIR Sensor** | **D2** | Optical motion detection (auxiliary telemetry forwarded to React UI) |
+| **Optional DHT11 Sensor** | **D4** | Temperature / humidity telemetry (forwarded to React UI) |
 | **Optional SG90 Servo** | **D6 (PWM)** | Mechanical flag indicator |
+
+> [!NOTE]
+> **Decommissioned:** The 16x2 I2C LCD has been removed from all required hardware configurations. Environmental monitoring, physical presence, RFID status, and hardware health are now streamed directly to the React security console.
 
 > [!IMPORTANT]
 > **v2.3 Buzzer Architecture Notice:** The 5V active buzzer is driven directly by Arduino Uno #1 on Pin D8 via the Supervisor Service. The alarm now depends on the local Laptop B serial path and no longer relies on an external ESP8266 Wi-Fi connection.
@@ -98,7 +100,7 @@ arduino-cli compile --fqbn esp32:esp32:esp32 firmware/esp32_signer/esp32_signer.
 arduino-cli upload -p COM_ESP32_B --fqbn esp32:esp32:esp32 firmware/esp32_signer/esp32_signer.ino
 ```
 
-### B. Arduino Uno #1 (Sensors & LCD)
+### B. Arduino Uno #1 (Environmental Sensors & Buzzer D8)
 ```powershell
 arduino-cli compile --fqbn arduino:avr:uno firmware/uno_operator/uno_operator.ino
 arduino-cli upload -p COM_UNO1_B --fqbn arduino:avr:uno firmware/uno_operator/uno_operator.ino
@@ -146,5 +148,5 @@ curl http://localhost:8010/supervisor/health
 ---
 
 ## 8. Safe Shutdown & Emergency Revocation
-- **Physical Panic Test:** Press GPIO32 on ESP32 #1. The signer displays `PANIC TRIGGERED`, broadcasts `revokeSession` directly to `http://localhost:8545`, and sounds the remote buzzer on Laptop A over Wi-Fi.
+- **Physical Panic Test:** Press GPIO32 on ESP32 #1. The signer displays `PANIC TRIGGERED`, broadcasts `revokeSession` directly to `http://localhost:8545`, and sounds the 5V active buzzer on Arduino Uno #1 Pin D8 via the Laptop B Supervisor.
 - **Stop Services:** Press `Ctrl + C` in Terminal 1, Terminal 2, and Terminal 3.

@@ -15,7 +15,11 @@ import {
   Download,
   AlertOctagon,
   EyeOff,
+  ChevronRight,
   Fingerprint,
+  Thermometer,
+  Droplets,
+  Volume2,
   Play,
   Flame,
   Users,
@@ -47,6 +51,7 @@ export default function App() {
   const [requiresRecovery, setRequiresRecovery] = useState<boolean>(false);
   const [recoveryReason, setRecoveryReason] = useState<string>('');
   const [mirageActive, setMirageActive] = useState<boolean>(false);
+  const [oledPage, setOledPage] = useState<number>(1);
 
   // Spending limits
   const [dailySpent, setDailySpent] = useState<number>(25);
@@ -267,7 +272,7 @@ export default function App() {
     panic_button: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'GPIO32 Physical Panic Button' },
     gateway_b: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Laptop B Hardware Serial Gateway' },
     uno_q_edge: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Arduino UNO Q 4GB Edge Security Node' },
-    uno_sensors: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: 'Arduino Uno #1 (Status LCD & Diagnostics)' },
+    uno_sensors: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: 'Arduino Uno #1 (Environmental Sensors & Buzzer D8)' },
     uno_buzzer: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: '5V Active Buzzer (Uno #1 Pin D8)' },
     blockchain_node: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Local Anvil Blockchain & Bundler (:8545)' },
     // Laptop A — Application & Operator Domain
@@ -581,6 +586,10 @@ export default function App() {
         {/* System Summary Footer */}
         <div className="p-3 border-t border-slate-800 text-[11px] font-mono text-slate-500 space-y-1">
           <div className="flex justify-between">
+            <span>Arch:</span>
+            <span className="text-slate-400">v2.3 Distributed</span>
+          </div>
+          <div className="flex justify-between">
             <span>CHAIN ID:</span>
             <span className="text-teal-400">31337 (Anvil)</span>
           </div>
@@ -796,6 +805,140 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* Environmental & Physical Desk Telemetry (Migrated from 16x2 LCD) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <Thermometer className="h-4 w-4 text-teal-400" />
+                    <h3 className="text-sm font-bold text-white">
+                      Desk Environment & Physical Telemetry
+                    </h3>
+                    <span className="text-[10px] bg-teal-950 text-teal-300 px-2 py-0.5 rounded border border-teal-800 font-mono">
+                      Migrated from 16x2 LCD
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">Source: Arduino Uno #1 via USB (Laptop B)</span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-4 text-xs font-mono">
+                  {/* Temp & Humidity */}
+                  <div className="bg-slate-950 p-3.5 rounded border border-slate-800 space-y-1.5">
+                    <div className="flex justify-between text-slate-400 text-[11px]">
+                      <span className="flex items-center gap-1"><Thermometer className="h-3 w-3 text-amber-400" /> Ambient Temp</span>
+                      <span className="text-white font-bold">23.5 °C</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400 text-[11px]">
+                      <span className="flex items-center gap-1"><Droplets className="h-3 w-3 text-cyan-400" /> Humidity</span>
+                      <span className="text-white font-bold">48.0% RH</span>
+                    </div>
+                    <p className="text-[10px] text-teal-400 pt-1 border-t border-slate-800">Sensor: DHT11 (Pin D4)</p>
+                  </div>
+
+                  {/* PIR Motion & Physical Presence */}
+                  <div className="bg-slate-950 p-3.5 rounded border border-slate-800 space-y-1.5">
+                    <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                      <span>PIR Presence:</span>
+                      <span className="flex items-center gap-1.5 text-teal-300 font-bold">
+                        <span className="h-2 w-2 rounded-full bg-teal-400 animate-ping" />
+                        ACTIVE
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">Desk Motion Observed</div>
+                    <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">Sensor: PIR (Pin D2)</p>
+                  </div>
+
+                  {/* RFID Status */}
+                  <div className="bg-slate-950 p-3.5 rounded border border-slate-800 space-y-1.5">
+                    <div className="flex justify-between text-slate-400 text-[11px]">
+                      <span>RFID Reader:</span>
+                      <span className="text-teal-400 font-bold">ONLINE</span>
+                    </div>
+                    <div className="text-[11px] text-purple-300 truncate font-bold">UID: A1B2C3D4</div>
+                    <p className="text-[10px] text-amber-300 pt-1 border-t border-slate-800">Tier: Junior Exception</p>
+                  </div>
+
+                  {/* 5V Active Buzzer */}
+                  <div className="bg-slate-950 p-3.5 rounded border border-slate-800 space-y-1.5">
+                    <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                      <span className="flex items-center gap-1"><Volume2 className="h-3 w-3 text-teal-400" /> 5V Active Buzzer:</span>
+                      <span className="text-teal-400 font-bold">STANDBY</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">Pin D8 (Uno #1) Armed</div>
+                    <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">Supervisor Actuation</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ESP32 #2 Operator Telemetry (OLED #2 Replica on Laptop A) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <Radio className="h-4 w-4 text-purple-400" />
+                    <h3 className="text-sm font-bold text-white">
+                      ESP32 #2 Operator Telemetry Screen (OLED #2 Replica on Laptop A)
+                    </h3>
+                  </div>
+                  <span className="text-[10px] bg-amber-950/70 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded font-mono font-bold">
+                    TELEMETRY ONLY — NEVER AN APPROVAL DEVICE (ZERO SIGNING KEYS)
+                  </span>
+                </div>
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <div className="col-span-6 bg-black border-2 border-slate-800 rounded p-3 font-mono text-xs text-white shadow-inner space-y-1">
+                    <div className="border-b border-slate-800 pb-1 text-slate-400 text-[10px] flex justify-between">
+                      <span>[BASTION X OPERATOR]</span>
+                      <span>OLED #2</span>
+                    </div>
+                    <div className="flex justify-between text-xs pt-1">
+                      <span className="text-slate-400">Agent:</span>
+                      <span className="text-teal-400 font-bold">IDLE / STANDBY</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">SOC:</span>
+                      <span className="text-teal-400 font-bold">HEALTHY</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Daily:</span>
+                      <span className="text-purple-300 font-bold">$25.00 / $100</span>
+                    </div>
+                    <div className="flex justify-between text-[11px] border-t border-slate-800 pt-1">
+                      <span className="text-slate-400">TXs: 3</span>
+                      <span className="text-slate-300">Last: ORD-2026-09</span>
+                    </div>
+                  </div>
+                  <div className="col-span-6 text-xs text-slate-400 space-y-2">
+                    <p>
+                      OLED #2 is connected directly to ESP32 #2 on Laptop A (RTX 5060) via I2C (GPIO21/22).
+                      It provides live local telemetry on daily budget consumption, security status, and agent workflow activity.
+                    </p>
+                    <div className="p-2.5 bg-slate-950 rounded border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
+                      <div className="text-teal-400 font-semibold">• Blockchain Status: Local Anvil (:8545) Online</div>
+                      <div>• Host Device: Laptop A USB (115200 baud)</div>
+                      <div className="text-amber-400/90 text-[10px]">🔒 Invariant: Strictly prohibited from holding keys or producing UserOp approvals.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Approval Alert Box */}
+              {approvals.some(a => a.status !== 'CONFIRMED' && a.status !== 'CANCELLED') && (
+                <div className="bg-purple-950/30 border border-purple-800/40 p-4 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Fingerprint className="h-5 w-5 text-purple-400" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-white">Pending Physical Transaction Review</h4>
+                      <p className="text-xs text-slate-400">An out-of-policy agent request is awaiting physical review on ESP32 OLED #1 and Owner co-signature.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCurrentRoute('approvals')}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center space-x-1"
+                  >
+                    <span>Open Approvals Console</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1249,37 +1392,92 @@ export default function App() {
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
                         <Radio className="h-4 w-4 text-purple-400" />
-                        OLED #1 Display Replica (Laptop B)
+                        OLED #1 Trusted Review Display (Laptop B)
                       </h3>
                       <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">SSD1306 128x64</span>
                     </div>
                     <p className="text-[11px] text-slate-400 mb-3">
-                      Read-only reflection of physical OLED screen wired to ESP32 #1 GPIO21/22.
+                      Read-only reflection of the actual physical OLED screen wired to ESP32 #1 GPIO21/22.
+                      Signing is strictly rejected if this display is unavailable or malfunctions.
                     </p>
 
-                    {/* OLED Screen Box */}
-                    <div className="bg-black border-4 border-slate-800 rounded-md p-4 font-mono text-cyan-400 text-xs shadow-inner h-44 flex flex-col justify-between select-none">
+                    {/* OLED Screen Box (4-Page Paginated Review) */}
+                    <div className="bg-black border-4 border-slate-800 rounded-md p-4 font-mono text-cyan-400 text-xs shadow-inner h-48 flex flex-col justify-between select-none">
                       <div className="border-b border-cyan-800/60 pb-1 flex justify-between text-[10px]">
                         <span>BASTION X OLED #1</span>
-                        <span>REVIEW 1/4</span>
+                        <span className="font-bold text-white">REVIEW {oledPage}/4</span>
                       </div>
-                      <div className="space-y-1 text-xs">
-                        <div>TOKEN: bUSD (6 dec)</div>
-                        <div className="text-sm font-bold text-white">
-                          AMT: {((selectedApproval?.intent.amountBaseUnits || 0) / 10**6).toFixed(2)} bUSD
+
+                      {oledPage === 1 && (
+                        <div className="space-y-1 text-xs">
+                          <div className="text-[10px] text-cyan-300">TOKEN: bUSD (6 dec)</div>
+                          <div className="text-sm font-bold text-white">
+                            AMT: {((selectedApproval?.intent.amountBaseUnits || 0) / 10**6).toFixed(2)} bUSD
+                          </div>
+                          <div className="text-[10px] text-cyan-400">FP: a7f4bc89 | T: JUNIOR</div>
+                          <div className="text-[10px] text-slate-400 pt-0.5">{'PRESS GPIO33 TO ADVANCE ->'}</div>
                         </div>
-                        <div className="text-[10px] text-cyan-300">RECIP: 0x00...00cc</div>
-                        <div className="text-[10px] text-cyan-500">FP: a7f4bc89 | T: JUNIOR</div>
-                      </div>
+                      )}
+
+                      {oledPage === 2 && (
+                        <div className="space-y-1 text-xs">
+                          <div className="text-[10px] text-amber-300 font-bold">FULL RECIPIENT ADDRESS:</div>
+                          <div className="text-[10px] text-white font-mono break-all">[1-21]:  0x0000000000000000000</div>
+                          <div className="text-[10px] text-teal-300 font-mono break-all">[22-42]: 000000000000000000cc</div>
+                          <div className="text-[10px] text-slate-400 pt-0.5">{'PRESS GPIO33 TO ADVANCE ->'}</div>
+                        </div>
+                      )}
+
+                      {oledPage === 3 && (
+                        <div className="space-y-1 text-xs">
+                          <div className="text-[10px] text-cyan-300">TARGET: MockToken (0x00...aa)</div>
+                          <div className="text-xs text-white">FUNC: transfer(address,uint256)</div>
+                          <div className="text-[10px] text-cyan-400">SELECTOR: 0xa9059cbb</div>
+                          <div className="text-[10px] text-slate-400 pt-0.5">{'PRESS GPIO33 TO ADVANCE ->'}</div>
+                        </div>
+                      )}
+
+                      {oledPage === 4 && (
+                        <div className="space-y-1 text-xs">
+                          <div className="text-[10px] text-cyan-300">CHAIN ID: 31337 (Local Anvil)</div>
+                          <div className="text-xs text-white">NONCE: 1 | EXP: +300s</div>
+                          <div className="text-[10px] text-purple-300 font-bold">SCAN RFID & HOLD APPROVE 1s</div>
+                          <div className="text-[10px] text-teal-400 pt-0.5">STATUS: READY FOR PHYSICAL AUTH</div>
+                        </div>
+                      )}
+
                       <div className="border-t border-cyan-800/60 pt-1 text-[10px] flex justify-between text-cyan-300">
                         <span>GPIO33: APPROVE</span>
                         <span>GPIO32: PANIC</span>
                       </div>
                     </div>
+
+                    {/* Page Switching Buttons */}
+                    <div className="mt-2.5 flex items-center justify-between text-xs">
+                      <div className="flex space-x-1.5">
+                        {[1, 2, 3, 4].map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setOledPage(p)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono ${
+                              oledPage === p
+                                ? 'bg-purple-600 text-white font-bold'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            P{p}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-teal-400 font-mono flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                        OLED #1 Health: OK
+                      </span>
+                    </div>
                   </div>
 
                   {/* Signatures status */}
-                  <div className="mt-4 pt-4 border-t border-slate-800 space-y-2 text-xs">
+                  <div className="mt-4 pt-3 border-t border-slate-800 space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-slate-400">ESP32 Hardware Signature:</span>
                       <span className={selectedApproval?.device_signature ? 'text-teal-400 font-mono font-bold' : 'text-amber-400 font-mono'}>
@@ -1291,6 +1489,10 @@ export default function App() {
                       <span className={selectedApproval?.owner_signature ? 'text-teal-400 font-mono font-bold' : 'text-amber-400 font-mono'}>
                         {selectedApproval?.owner_signature ? 'VERIFIED [0x1111...]' : 'PENDING SUPERVISOR'}
                       </span>
+                    </div>
+                    <div className="p-2 bg-slate-950 rounded border border-slate-800 text-[10px] text-slate-400 flex justify-between font-mono">
+                      <span>RFID: Card A1B2C3D4 (Junior)</span>
+                      <span>Desk PIR: Motion Verified</span>
                     </div>
                   </div>
                 </div>
@@ -1515,7 +1717,7 @@ export default function App() {
                     <div>• GPIO33 Approve Button (Sustained Press)</div>
                     <div>• GPIO32 Panic Button (Interrupt + Direct RPC Revoke)</div>
                     <div>• Arduino UNO Q 4GB (Linux Edge Gateway &amp; Telemetry)</div>
-                    <div>• Arduino Uno #1 (5V Active Buzzer D8, Status LCD A4/A5, Opt. PIR/DHT11)</div>
+                    <div>• Arduino Uno #1 (5V Active Buzzer D8, PIR D2, DHT11 D4, Opt. Servo D6 — 16x2 LCD Decommissioned)</div>
                     <div className="text-teal-400 text-[10px] pt-1 border-t border-slate-800">🔒 Anvil Blockchain (31337) &amp; Bundler on Laptop B</div>
                   </div>
                 </div>
@@ -1531,6 +1733,26 @@ export default function App() {
                     <div>• Zero mandatory hardware assigned</div>
                     <div>• Standby Anvil mirror ready</div>
                     <div>• Failover RPC target if Laptop A or B network fails</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pinout and Interface Matrix */}
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
+                <h3 className="text-sm font-bold text-white">Direct Pinout Matrix</h3>
+                <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                  <div className="p-3 bg-slate-950 rounded border border-slate-800 space-y-1 text-slate-300">
+                    <div className="font-bold text-purple-300">Laptop A Connections:</div>
+                    <div>• ESP32 #2: SDA (GPIO 21), SCL (GPIO 22)</div>
+                    <div>• Uno #2: Fault injection relay / heartbeat pins</div>
+                    <div>• HD Webcam: USB Direct Bus</div>
+                  </div>
+                  <div className="p-3 bg-slate-950 rounded border border-slate-800 space-y-1 text-slate-300">
+                    <div className="font-bold text-teal-300">Laptop B Connections:</div>
+                    <div>• ESP32 #1: OLED (SDA 21, SCL 22), RFID (18, 19, 23, 5, 27)</div>
+                    <div>• Buttons: Approve (GPIO 33), Panic (GPIO 32)</div>
+                    <div>• Uno #1: 5V Buzzer (D8), PIR (D2), DHT11 (D4), Servo (D6)</div>
+                    <div className="text-amber-400 font-semibold">• 16x2 I2C LCD: DECOMMISSIONED (Telemetry displayed on React console)</div>
                   </div>
                 </div>
               </div>

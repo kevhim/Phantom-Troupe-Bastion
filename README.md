@@ -39,7 +39,7 @@ This repository provides an implemented, security-hardened smart contract, firmw
 | Node | Responsibilities | Hardware Attached | Software Components |
 |---|---|---|---|
 | **Laptop A** (RTX 5060, 32GB RAM) | Application Host, AI Agent, Computer Vision, DB & UI | Built-in / Owned Webcam, ESP32 #2 + OLED #2 (Operator Telemetry), Arduino Uno #2 (Watchdog) | React 18 Web Console (:5173), FastAPI Backend (:8000), AI Purchasing Agent, OpenCV Vision, Mirage Engine, SQLite DB |
-| **Laptop B** (Intel Ultra 7 155H, 32GB RAM) | Trusted Authorization, Hardware Signer & Blockchain Host | ESP32 #1 Dedicated Signer (OLED #1, RC522 RFID, GPIO33 Approve, GPIO32 Panic), Arduino UNO Q 4GB (USB-C), Arduino Uno #1 (**5V Active Buzzer Pin D8**, LCD, opt. PIR/DHT/Servo) | **Local Anvil Blockchain (:8545, 31337)**, ERC-4337 Bundler, Supervisor Service (:8010), Hardware Gateway, Independent Audit Storage |
+| **Laptop B** (Intel Ultra 7 155H, 32GB RAM) | Trusted Authorization, Hardware Signer & Blockchain Host | ESP32 #1 Dedicated Signer (OLED #1, RC522 RFID, GPIO33 Approve, GPIO32 Panic), Arduino UNO Q 4GB (USB-C), Arduino Uno #1 (**5V Active Buzzer Pin D8**, opt. PIR/DHT/Servo; 16x2 LCD decommissioned) | **Local Anvil Blockchain (:8545, 31337)**, ERC-4337 Bundler, Supervisor Service (:8010), Hardware Gateway, Independent Audit Storage |
 | **Laptop C** (RTX 4060, Standby) | Cold / Hot Standby Backup Node | None (Day 1) | Standby Anvil RPC Mirror, Auxiliary Compute & Failover |
 
 ---

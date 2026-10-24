@@ -1,4 +1,4 @@
-# Test Plan V2 — Evidence Before Features
+# Test Plan V2.3 — Evidence Before Features
 
 ## P0 wallet W3-02: must execute on real local ERC-4337
 - Authorized 20 token transfer succeeds through bundler and EntryPoint; tx receipt/actual token balance changes verified.
@@ -14,21 +14,24 @@
 - Swipe Card 1 + press direct approval -> low-tier hardware co-signature; **without independent owner signature, all out-of-policy payment attempts fail**, even below low cap. After independent owner one-off signature, low-tier exception passes within ceiling; large exception rejected on-chain.
 - Card 2 + direct button + independent owner signature for high-tier request -> authorized exact payment succeeds within configured on-chain cap; missing owner signature rejected, even if direct physical button was pressed.
 - Change 1 bit in token, recipient, amount, contract, function selector, chain, wallet, nonce, deadline or calldata -> approval fails.
-- Untrusted fake `APPROVE` serial packet from B or A does **not** cause signer to sign. USB debugging cannot remotely trigger sign request. LCD misinformation on Uno1 cannot affect ESP32 OLED truth.
+- Untrusted fake `APPROVE` serial packet from B or A does **not** cause signer to sign. USB debugging cannot remotely trigger sign request. Untrusted telemetry from Uno #1 cannot affect ESP32 OLED #1 truth.
+- Trusted display availability check: Disconnecting or corrupting OLED #1 causes ESP32 #1 to reject signing immediately.
 - Swap intent during physical review -> review invalidated; no signature on old or new payload without fresh full review.
 - Signer reset/unplug -> no signature, no previously cached approval replay; annotate if firmware hardening unavailable.
 
 ## P2 direct emergency
-- App A API service stopped; Anvil/RPC still reachable: ESP32 presses direct GPIO panic -> sends actual signed revocation without A API -> confirms on-chain; ESP8266 remote alert receives event if WiFi reachable.
+- App A API service stopped; Anvil/RPC still reachable: ESP32 presses direct GPIO panic -> sends actual signed revocation without A API -> confirms on-chain; sounds 5V active buzzer on Uno #1 Pin D8 via Laptop B Supervisor.
 - A RPC also stopped: show `REVOKE_UNAVAILABLE`; do not pretend it succeeded. Optional Laptop C host RPC test with A fully down.
 - Separate timers for local hardware lock vs chain inclusion. Ensure revoke key cannot call transfer, raise limit, add recipient or approve spend.
 - Competing pending agent payment may execute first; document onchain ordering and gas.
 
 ## P3 telemetry, data, UX
 - PIR off cannot alone assert user absent. Camera second-face may false-negative outside field of view; classify advisory.
-- UTF-8/long address correctly scrolls on OLED, all 40 hex address chars visible in review and checked.
+- Full recipient address correctly displayed across paginated screens on OLED #1; all 42 characters visible in review and checked.
+- OLED #2 on Laptop A provides operator telemetry only and cannot approve UserOps.
+- Environmental monitoring, presence, and hardware telemetry migrated from decommissioned 16x2 LCD accurately displayed on React console.
 - `Included` but `ExecutionReverted` not displayed as green paid.
 - Hash-chain modified entry fails against independent checkpoint. Mirage only uses synthetic test data and displays test mode to judges.
 
 ## Acceptance evidence
-Store sanitized test outputs (not keys) in `/tests/fixtures`, screenshot timestamps and on-chain tx/userop hashes in reproducible demo fixture manifest; mark anything simulator-produced as simulated.
+Store sanitized test outputs (not keys) in `/tests/fixtures`, screenshot timestamps and on-chain tx/userop hashes in reproducible demo fixture manifest; mark anything simulator-produced as simulated. Mark real physical hardware validation as NOT EXECUTED unless physically performed.

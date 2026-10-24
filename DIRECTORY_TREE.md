@@ -29,7 +29,7 @@
 │   ├── esp8266_alert/
 │   │   └── esp8266_alert.ino (Laptop A Power: Remote Wi-Fi Buzzer and Incident Alarm Node)
 │   ├── uno_operator/
-│   │   └── uno_operator.ino (Laptop B: Uno #1 PIR, DHT11, 16x2 LCD Status Node, Optional Servo)
+│   │   └── uno_operator.ino (Laptop B: Uno #1 5V Active Buzzer D8, PIR, DHT11 Environmental Node; 16x2 LCD Decommissioned)
 │   └── uno_watchdog/
 │       └── uno_watchdog.ino (Laptop A: Uno #2 Auxiliary Watchdog, Heartbeat & Fault Generator)
 ├── services/
