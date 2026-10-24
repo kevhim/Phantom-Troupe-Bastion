@@ -75,3 +75,61 @@ export interface ForensicEvent {
   previous_event_hash: string;
   current_event_hash: string;
 }
+
+export interface AttackScenario {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  attempted_amount: number;
+  expected_outcome: string;
+  status: 'IDLE' | 'RUNNING' | 'CONTAINED' | 'REJECTED' | 'FAILED';
+  actual_loss: number;
+  rejection_reason?: string;
+  tx_hash?: string;
+  user_op_hash?: string;
+  on_chain_result?: string;
+  freeze_state?: string;
+}
+
+export interface GuardianInfo {
+  address: string;
+  name: string;
+  voted: boolean;
+  vote_timestamp?: number;
+}
+
+export interface RecoveryProposalState {
+  proposal_id: string;
+  status: 'NONE' | 'COLLECTING_APPROVALS' | 'TIMELOCKED' | 'EXECUTED' | 'VETOED';
+  current_owner: string;
+  proposed_owner: string;
+  votes_collected: number;
+  quorum_required: number;
+  quorum_reached_at?: number;
+  ready_at?: number;
+  remaining_seconds?: number;
+  can_execute: boolean;
+}
+
+export interface PaymasterQuota {
+  agent_id: string;
+  name: string;
+  account_address: string;
+  allocated_gas: number;
+  consumed_gas: number;
+  remaining_gas: number;
+  deposit_busd: number;
+  status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN';
+}
+
+export interface CircuitBreakerState {
+  status: 'ACTIVE' | 'FROZEN_AUTOMATIC' | 'FROZEN_MANUAL' | 'RECOVERY_PENDING' | 'RECOVERED';
+  last_trigger_rule?: string;
+  frozen_at?: number;
+  velocity_violations: number;
+  burst_violations: number;
+  detection_rate: number;
+  false_freeze_rate: number;
+  precision: number;
+}

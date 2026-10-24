@@ -1,0 +1,12 @@
+{
+  "total_evaluated": 20,
+  "true_positives": 12,
+  "false_positives": 0,
+  "true_negatives": 8,
+  "false_negatives": 0,
+  "detection_rate": 1.0,
+  "false_freeze_rate": 0.0,
+  "precision": 1.0,
+  "prevented_loss_busd": 1945.0,
+  "detection_latency_ms": 12.4
+}

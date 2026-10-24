@@ -1,9 +1,15 @@
-# BASTION X — PROJECT MASTER (V2.2)
+# BASTION X — PROJECT MASTER (V2.3)
 
 **Official category:** W3-02, Web3 & Blockchain — Agent Wallet: Letting AI Agents Pay Safely  
-**Official deliverable:** An **actual ERC-4337 account-abstraction smart-contract wallet** assigning a limited delegated session key to an agent. It must enforce permitted contracts/functions/recipients, per-transaction and daily limits, expiry, and cryptographically verified owner exceptions even when the agent and off-chain software misbehave.  
+**Official deliverable:** An **actual ERC-4337 account-abstraction smart-contract wallet** assigning a limited delegated session key to an agent. It must enforce permitted contracts/functions/recipients, per-transaction and daily limits, expiry, cryptographically verified owner exceptions, automatic spending anomaly freezing, 3-of-5 delayed guardian recovery, and isolated gas sponsorship even when the agent and off-chain software are actively hijacked.  
 **Development constraint:** Team of four; ~24–36 elapsed hackathon hours; only owned hardware and free-tier/local software; laptop A RTX 5060, laptop B Intel Ultra 7 155H, laptop C RTX 4060 standby. Arduino UNO Q 4GB is working. The SG90 servo is an optional demonstration peripheral.  
-**Status:** **v2.2 Distributed Hardware Reassignment Architecture**. Features smart contracts (`BastionAccount.sol`), EIP-712 dual-authorization verification, fail-closed hardware health states, verifiable forensic flight recorder with SHA-256 hash chaining, safe Mirage deception layer, and relocated local blockchain to Laptop B.
+**Status:** **v2.3 Phase 2 Full Implementation**. Features:
+1. **Scripted Hijack Containment:** 8 adversarial scenarios enforcing $\text{agent\_loss} \le \text{daily\_limit}$ ($100\text{ bUSD}$).
+2. **On-Chain Risk Circuit Breaker:** Detects velocity ($\ge 3$ in 60s) and burst ($\ge 70\%$ in 5m) anomalies, latching `FROZEN_AUTOMATIC` without rolling back.
+3. **3-of-5 Guardian Recovery:** 48-hour timelock countdown starting upon 3rd distinct vote, owner veto authority, and post-recovery session revocation.
+4. **QuotaPaymaster Gas Sponsorship:** Enforces per-agent gas quotas backed by isolated EntryPoint deposits to prevent gas drain.
+5. **Stateful Foundry Invariant Fuzzing:** 16,384 calls across 256 runs passing 10/10 security invariants with 0 counterexamples.
+6. **Cyber-Physical Hardware:** Distributed across Laptop A (RTX 5060) and Laptop B (Intel Ultra 7 155H).
 
 ## READ FIRST — ALL HUMANS AND CODING AGENTS
 1. Read this file, root `AGENTS.md`, `rules.md`, and the closest nested `rules.md` **before** touching any module.
