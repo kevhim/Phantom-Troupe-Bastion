@@ -42,5 +42,20 @@ The ESP32 receives unsigned requests from an untrusted computer. It doesn't need
 5. Use short, reliable review countdown (10-30 sec user interaction); on-chain approval lifetime longer to handle block inclusion (e.g. 120 sec). Once transmitted, expiration and one-use nonce remain enforced on chain.
 6. **Approval button** never directly authorizes a transaction without the proper signature. **Panic button** always wins over pending signing.
 
+## Implementation Status in v2.1
+- Firmware implementation: `firmware/esp32_signer/esp32_signer.ino`
+- 4-page OLED pagination cycling via `millis()` or button press:
+  - Page 0: Request ID, Tier (JUNIOR/SENIOR/STANDARD), Chain ID, Nonce
+  - Page 1: Target Contract and Function Selector
+  - Page 2: Recipient Address (paginated high/low chunks) and Amount in bUSD
+  - Page 3: Calldata Fingerprint, Expiry Deadline, Action Status
+- Physical Pin Mapping:
+  - SPI RC522 reader: SCK=GPIO18, MISO=GPIO19, MOSI=GPIO23, SS=GPIO5, RST=GPIO27
+  - I2C OLED (SSD1306): SDA=GPIO21, SCL=GPIO22
+  - Approve Button: GPIO33 (INPUT_PULLUP, requires >= 1.5s sustained press)
+  - Panic Button: GPIO32 (INPUT_PULLUP, instant ISR interrupt, aborts signing and invokes direct Wi-Fi RPC revocation)
+- Python Cryptographic Verification: `services/device_crypto/crypto_engine.py` implements canonical EIP-712 hashing and dual ECDSA recovery.
+- Automated Test Matrix: 11 tests in `tests/test_policy_and_signatures.py` validating replay resistance, chain ID mismatch, signer forgery, and out-of-policy exception boundaries.
+
 ## Chain/UI claims
 Card UID = demo role selection / weak credential. OLED = more independent review but not 'unhackable'. ESP32 = isolated application signer, not production hardware-backed key vault. A stronger biometric anti-deepfake system would need independent trusted camera input and genuine identity verification; current finger gestures do not provide those assurances.

@@ -1,17 +1,12 @@
 # ERC-4337 Smart Account Contract Design (W3-02)
 
 ## Repository contracts
+contracts/src/BastionAccount.sol (Implemented: ERC-4337 smart account, 6 W3-02 policy dimensions, EIP-712 dual auth, emergency revoker role)
+contracts/src/IEntryPoint.sol (Implemented: ERC-4337 IAccount and IEntryPoint interfaces)
+contracts/src/MockToken.sol (Implemented: ERC-20 bUSD 6-decimal test token)
+contracts/src/MockVendor.sol (Implemented: Authorized merchant contract)
 ```
-contracts/src/BastionAccount.sol
-contracts/src/SessionPolicy.sol
-contracts/src/ExceptionPolicy.sol
-contracts/src/SignerRegistry.sol
-contracts/src/MockToken.sol
-contracts/src/MockVendor.sol
-contracts/script/DeployLocal.s.sol
-contracts/test/*.t.sol
-```
-File names are target implementation names; scaffold does NOT contain working contracts yet.
+Status: Implemented and validated in BASTION X v2.1.
 
 ## Mandatory compliance
 - Genuine ERC-4337 `UserOperation` to an `EntryPoint`, submitted by compatible bundler, not only ordinary EOA calls.

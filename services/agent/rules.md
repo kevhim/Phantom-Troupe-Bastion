@@ -1,7 +1,8 @@
-# Local rules — `services/agent` (BASTION X V2)
+# Local rules — `services/agent` (BASTION X v2.2)
 
 Read `/PROJECT_MASTER.md`, `/AGENTS.md`, and ancestor `rules.md` files first. Read this directory's domain specification before implementing.
 
-**Directory scope:** Agent only holds time-limited session key. Intent is untrusted, cannot override chain or pretend hardware approval. Scripted reliable demo first.
-
-**Cross-directory contract:** do not silently modify wallet permissions, EIP712 serialization, signer wiring, network dependencies, database role, UI truthfulness, or claimed implementation state. Update docs and tests in same pull request.
+**Directory scope:**
+- Owned by: Laptop A (RTX 5060).
+- Purpose: AI Purchasing Agent (`purchasing_agent.py`) generating structured payment requests.
+- Security boundary: Holds time-limited delegated agent session key ONLY. All intents are subject to on-chain policy enforcement on Laptop B's Anvil node. Agent key theft cannot exceed pre-configured contract ceilings.

@@ -1,7 +1,9 @@
-# Local rules — `firmware/uno_operator` (BASTION X V2)
+# Local rules — `firmware/uno_operator` (BASTION X v2.2)
 
 Read `/PROJECT_MASTER.md`, `/AGENTS.md`, and ancestor `rules.md` files first. Read this directory's domain specification before implementing.
 
-**Directory scope:** Firmware: verify GPIO voltages/pin labels, no direct 5V Arduino output to ESP32 input, no MCU telemetry may impersonate financial approval. ESP32_signer is sole device-side signature root; Uno#1 sensors/LCD are noncritical.
-
-**Cross-directory contract:** do not silently modify wallet permissions, EIP712 serialization, signer wiring, network dependencies, database role, UI truthfulness, or claimed implementation state. Update docs and tests in same pull request.
+**Directory scope:**
+- Owned by: Laptop B (Intel Ultra 7 155H).
+- Hardware: Arduino Uno #1 with PIR (D2), DHT11 (D4), 16x2 I2C LCD (A4/A5), and optional SG90 servo (D6).
+- Purpose: Non-critical environmental telemetry and status display for the supervisor desk.
+- Security restriction: Strictly FORBIDDEN from generating or verifying transaction signatures. Must not be trusted by the ERC-4337 smart wallet.
