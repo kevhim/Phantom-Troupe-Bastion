@@ -28,3 +28,4 @@ Thumbs.db
 # Local integration evidence and private device provisioning
 scratch/
 firmware/esp32_signer/config.h
+*.tsbuildinfo
