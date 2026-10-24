@@ -1,7 +1,8 @@
-# Local rules — `services/supervisor` (BASTION X V2)
+# Local rules — `services/supervisor` (BASTION X v2.2)
 
 Read `/PROJECT_MASTER.md`, `/AGENTS.md`, and ancestor `rules.md` files first. Read this directory's domain specification before implementing.
 
-**Directory scope:** Backend and gateways are untrusted for financial authority. Never forge GPIO approvals or sign with ESP32 key on host. SQLite is projection; actual state chain. Laptop B gateway only owns sensor USB ports.
-
-**Cross-directory contract:** do not silently modify wallet permissions, EIP712 serialization, signer wiring, network dependencies, database role, UI truthfulness, or claimed implementation state. Update docs and tests in same pull request.
+**Directory scope:**
+- Owned by: Laptop B (Intel Ultra 7 155H).
+- Purpose: Supervisor authorization service, independent audit checkpoint storage (`C:\bastion_audit_checkpoints`), hardware gateway orchestration, and direct RPC emergency revocation.
+- Security boundary: Preserves audit checkpoints outside Laptop A's application database. Coordinates with ESP32 #1 without ever exporting private signing keys to the application layer.

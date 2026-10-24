@@ -1,13 +1,13 @@
-# BASTION X — PROJECT MASTER (V2.0)
+# BASTION X — PROJECT MASTER (V2.2)
 
 **Official category:** W3-02, Web3 & Blockchain — Agent Wallet: Letting AI Agents Pay Safely  
 **Official deliverable:** An **actual ERC-4337 account-abstraction smart-contract wallet** assigning a limited delegated session key to an agent. It must enforce permitted contracts/functions/recipients, per-transaction and daily limits, expiry, and cryptographically verified owner exceptions even when the agent and off-chain software misbehave.  
-**Development constraint:** Team of four; ~24–36 elapsed hackathon hours; only owned hardware and free-tier/local software; laptop A RTX 5060, laptop B Intel Ultra 7 155H, laptop C RTX 4060 standby. Arduino UNO Q 4GB is working. The SG90 servo was previously reported unresponsive; treat optional unless tested.  
-**Status:** This is a **v2 architecture scaffold**. It contains design documentation, rules and sample schemas, not an implemented or audited wallet.
+**Development constraint:** Team of four; ~24–36 elapsed hackathon hours; only owned hardware and free-tier/local software; laptop A RTX 5060, laptop B Intel Ultra 7 155H, laptop C RTX 4060 standby. Arduino UNO Q 4GB is working. The SG90 servo is an optional demonstration peripheral.  
+**Status:** **v2.2 Distributed Hardware Reassignment Architecture**. Features smart contracts (`BastionAccount.sol`), EIP-712 dual-authorization verification, fail-closed hardware health states, verifiable forensic flight recorder with SHA-256 hash chaining, safe Mirage deception layer, and relocated local blockchain to Laptop B.
 
 ## READ FIRST — ALL HUMANS AND CODING AGENTS
 1. Read this file, root `AGENTS.md`, `rules.md`, and the closest nested `rules.md` **before** touching any module.
-2. Consult `docs/SECURITY_THREAT_MODEL.md`, `docs/TRUSTED_SIGNER_DESIGN.md`, `docs/CONTRACT_DESIGN.md` and `docs/INTEGRATION_PROTOCOL.md` before touching signatures, money flows, or node messages.
+2. Consult `docs/HARDWARE_MAP.md`, `docs/SECURITY_THREAT_MODEL.md`, `docs/TRUSTED_SIGNER_DESIGN.md`, `docs/CONTRACT_DESIGN.md` and `docs/setup/TWO_LAPTOP_INTEGRATION.md` before touching signatures, money flows, or node messages.
 3. Treat diagrams as **plans**, not verified functionality. Never label a mock RPC result or UI animation as a real signed operation.
 4. Commit no real secrets, wallet mnemonics, private keys, customer records or recorded biometric images. Use fake money on a local chain.
 5. Any change to a role, pin, public API, hardware owner, signer hash, or on-chain permission must update this master + the corresponding docs/tests.
@@ -21,7 +21,7 @@ The agent can autonomously pay approved vendors using a restricted ERC-4337 sess
 1. **On-device signing (ACCEPT with conditions).** Private exception signer is provisioned and used **on ESP32 #1**, not on laptop A or its backend. ESP32's ordinary flash is **not an audited secure element**. Determine variant and provisioning; secure boot/flash encryption optional later after recovery planning. Restrict on-chain authority of this signer so theft cannot grant unlimited spending. Owner/admin root signing remains on independently managed owner wallet, never on the AI host.
 2. **Independent review (ACCEPT, rewire).** At least one 3.3V OLED connects **directly to ESP32 #1** and receives the same canonical operation used for signing. Show full address across pages, amount/token/contract/function/chain, operation fingerprint, expiration; never trust text supplied solely by laptop A. LCD on Uno#1 is status-only unless made an equally independent trusted device.
 3. **Junior/Senior roles (ACCEPT as demonstration tiers).** Card 1 selects JUNIOR review and card 2 SENIOR review. RC522 UID is clonable and not strong user authentication. Contract must enforce cryptographic approval authority, low/high value caps, and independent owner signature for high-tier changes/payments. Never claim UID is a secure cryptographic factor.
-4. **Panic channel (ACCEPT with limitations).** ESP32 #1 can sign/send `revokeSession` through independent direct JSON-RPC (not through app API) using its **revocation-only** role/key with funded gas. This bypasses **application software** but still needs working Wi-Fi/router, RPC and chain. The local Anvil chain on laptop A is NOT available if host A or its network is fully offline. For stronger fault demo, move a real chain/RPC to laptop C, or use a reachable public test chain if available. Revocation effective only when on-chain confirmed.
+4. **Panic channel (ACCEPT with independent RPC on Laptop B).** ESP32 #1 can sign/send `revokeSession` through independent direct JSON-RPC to the local Anvil node hosted on Laptop B using its **revocation-only** role/key with funded gas. This bypasses Laptop A application software and guarantees revocation even if Laptop A is powered off. Revocation effective only when on-chain confirmed.
 5. **Mirage mode (STRETCH).** Synthetic isolated records and token fixtures only. Never redirect legitimate blockchain calls to a "fake chain" without a visible simulation label for judges; never claim this prevents violence or coercion. Quiet remote alert is possible; a buzzer is not secret when audible nearby. Trigger chain revocation separately.
 
 ## CORE SECURITY INVARIANTS
@@ -37,19 +37,36 @@ S9. Software integrity, hardware compromise, phishing of independent signer, sto
 S10. Logs are tamper-evident only with protected independent checkpoints. No raw wallet keys, full prompts, images or customer data on a public chain.
 S11. No two laptop processes own the same serial device; avoid connecting unrelated 5V USB power rails. RC522 and ESP32 GPIO are 3.3V; never connect Arduino 5V TX to ESP32 input without a proper compatible interface.
 
-## MACHINE ALLOCATION — FINAL V2
-### LAPTOP A (RTX 5060, 32GB RAM) — UNTRUSTED APPLICATION/CHAIN LAB
-- Frontend (`apps/web`); main API (`services/api`); AI agent (`services/agent`); vision (`services/vision`, built-in/owned camera); SQLite; Anvil + proper ERC-4337 bundler; contract deployment/indexer.
-- USB **ESP32 #2 and OLED #2** as the untrusted operator-side display/telemetry station on A; **never any signing key on A**. This gives both primary laptops real IoT connections. Host chain exposed to peer LAN only as required for tests, not indiscriminately to Internet.
-### LAPTOP B (Intel Ultra 7 155H, 32GB RAM) — PHYSICAL SECURITY STATION
-- ESP32 #1 is **physically wired** to RC522 RFID, **OLED #1 trusted review**, panic Button #1 and approval Button #2. OLED #2 goes on ESP32 #2 on laptop A for auxiliary visualization; ESP32 #1 alone signs. It signs **on device** and may directly broadcast revocation; connected to B by USB for flashing/power only, with serial signing/debug commands disabled in deployed firmware.
-- Arduino UNO Q 4GB connects to B for management and runs edge telemetry + local security status, **not wallet owner key**.
-- Classic Uno #1 on B: PIR, DHT11, 16x2 LCD, optional SG90 servo; peripheral telemetry only.
-- ESP8266 buzzer/LED communicates over LAN; Wi-Fi power from B USB as needed. Sound at security/supervisor location, not a guaranteed covert alarm.
-- Classic Uno #2 stays **reserved** for independent watchdog/diagnostics if useful; don't create fake critical security role just to use every board.
-- Independent supervisor browser/user may use a separate owner/admin wallet/key stored only on B; for high-value approvals it signs an additional bound EIP-712 authorization. For strong host-A-compromise demo, isolate B signing secrets from A.
-### LAPTOP C (RTX 4060 16GB RAM) — OPTIONAL BACKUP
-- No hardware on day one. Can host chain/RPC to preserve blockchain reachability when laptop A backend is killed, contract/CI work, or own moved devices if ports are insufficient.
+## MACHINE ALLOCATION — FINAL V2.2
+### LAPTOP A (RTX 5060, 32GB RAM) — APPLICATION & OPERATOR DOMAIN
+- Role: Web UI (`apps/web` :5173), FastAPI Backend (`services/api` :8000), AI Purchasing Agent, Computer Vision (Webcam), SQLite App DB, Mirage Engine, SOC Dashboard.
+- Hardware Attached:
+  - Built-in / Owned Webcam (Optical Face Counting & Challenge-Response Liveness)
+  - ESP32 #2 via USB + OLED #2 (I2C: SDA 21, SCL 22) — Operator Telemetry only (NO SIGNING KEYS)
+  - Arduino Uno #2 via USB — Auxiliary Watchdog, Heartbeat & Fault Generator (strictly untrusted for transactions)
+  - ESP8266 NodeMCU via USB — 5V Power for Active Buzzer on D1/GPIO5 and LED on D4/GPIO2 (receives authenticated Wi-Fi alerts from Laptop B)
+- **Security Rule: NEVER store owner root signing keys or privileged ESP32 keys on Laptop A.**
+
+### LAPTOP B (Intel Ultra 7 155H, 32GB RAM) — TRUSTED AUTHORIZATION & BLOCKCHAIN HOST
+- Role: Physical Security Gateway, Supervisor Workstation, Local Blockchain & Bundler Host, Independent Audit Storage.
+- Hardware Attached:
+  - ESP32 #1 Dedicated Hardware Signer via USB:
+    - RC522 RFID Reader (SPI: SCK 18, MISO 19, MOSI 23, SS 5, RST 27)
+    - OLED #1 Trusted Review (I2C: SDA 21, SCL 22, 4-Page Paginated Review)
+    - Physical Approval Button (GPIO 33, sustained press >= 1.5s)
+    - Physical Panic Button (GPIO 32, instant ISR interrupt + direct Wi-Fi revocation)
+  - Arduino UNO Q 4GB via USB-C (Linux edge coordinator service & gateway telemetry)
+  - Arduino Uno #1 via USB (PIR D2, DHT11 D4, 16x2 LCD A4/A5, optional SG90 servo D6)
+- Software Services:
+  - **Local Anvil Blockchain Node (:8545, Chain ID 31337)**
+  - Compatible ERC-4337 Bundler Service
+  - Supervisor Service (:8010) & Serial Hardware Gateway
+  - Independent Audit Storage (`C:\bastion_audit_checkpoints` or `/opt/bastion/audit_checkpoints`)
+
+### LAPTOP C (RTX 4060, 16/32GB RAM) — HOT-STANDBY BACKUP NODE
+- Role: Cold/hot standby failover node.
+- Hardware: Zero mandatory physical hardware units on Day 1.
+- Fallback Tasks: Standby Anvil mirror, auxiliary CI/Foundry test runner, or compute failover.
 
 ## DATA / CONTROL PLANES
 - `apps/web`: 8 operational pages, 72 conceptual UI components (66 page widgets + 6 shell widgets); full details in `docs/FRONTEND_SPEC.md`.
