@@ -152,62 +152,104 @@ export const ApprovalsView: React.FC = () => {
 
             {/* ═══ 128x64 SSD1306 OLED SCREEN (OPAQUE BG-ZINC-950 HARDWARE INSET) ═══ */}
             <div className="mb-6">
-              <div className="bg-zinc-950 border border-zinc-800 rounded-[8px] p-5 font-mono min-h-[154px] flex flex-col justify-between text-emerald-400 relative overflow-hidden select-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
+              <div className="bg-zinc-950 border border-zinc-800 rounded-[8px] p-5 font-mono min-h-[160px] flex flex-col justify-between text-emerald-400 relative overflow-hidden select-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
                 {/* Header bar on OLED */}
                 <div className="flex justify-between items-center text-[10px] text-emerald-500/80 border-b border-emerald-950 pb-1.5 mb-2">
-                  <span>BASTION HW SIGNER v2</span>
-                  <span>PAGE {store.oledPage}/3</span>
+                  <span className="font-bold tracking-wider">BASTION HW SIGNER v2.3</span>
+                  <span>{approval ? `PAGE ${store.oledPage}/3` : 'IDLE'}</span>
                 </div>
 
-                {/* OLED Content based on page */}
+                {/* OLED Content based on state & page */}
                 <div className="flex-1 flex flex-col justify-center py-1">
-                  {store.oledPage === 1 && (
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
-                        AMOUNT REVIEW:
+                  {store.rfidError ? (
+                    <div className="space-y-1 py-1">
+                      <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>NFC AUTHENTICATION REQUIRED</span>
                       </div>
-                      <div className="text-2xl font-bold text-emerald-300 tracking-wide tabular-nums">
-                        {approval ? `$${approval.amountUsdc.toFixed(2)} USDC` : '$50.00 USDC'}
+                      <div className="text-[10px] text-white/90 leading-tight font-sans">
+                        {store.rfidError}
+                      </div>
+                      <div className="text-[9px] text-emerald-400 uppercase tracking-widest mt-1">
+                        &gt; Tap Card 1 or Card 2 Below
+                      </div>
+                    </div>
+                  ) : !approval ? (
+                    <div className="space-y-1 text-center py-2">
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">
+                        TRUSTED SIGNER: IDLE
+                      </div>
+                      <div className="text-base font-bold text-emerald-300">
+                        NO PENDING EXCEPTIONS
                       </div>
                       <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
-                        POLICY: EXCEEDS $25 AUTONOMOUS
+                        STATUS: ONLINE • FIRMWARE v2.3
+                      </div>
+                      <div className="text-[9px] text-white/50 pt-0.5">
+                        {store.rfidState === 'NO_CARD' ? 'NFC SENSOR READY • TAP CARD' : `NFC CARD SCANNED: ${store.rfidState.replace('_', ' ')}`}
                       </div>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {store.oledPage === 1 && (
+                        <div className="space-y-1">
+                          <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                            AMOUNT REVIEW:
+                          </div>
+                          <div className="text-2xl font-bold text-emerald-300 tracking-wide tabular-nums">
+                            ${approval.amountUsdc.toFixed(2)} USDC
+                          </div>
+                          <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
+                            POLICY: EXCEEDS ${store.maxPerTx.toFixed(2)} AUTONOMOUS
+                          </div>
+                        </div>
+                      )}
 
-                  {store.oledPage === 2 && (
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
-                        RECIPIENT REVIEW:
-                      </div>
-                      <div className="text-[11px] font-bold text-emerald-300 break-all leading-tight">
-                        {approval?.recipientAddress || '0xABCD000000000000000000000000000000001234'}
-                      </div>
-                      <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
-                        LABEL: {approval?.merchantName || 'Verified Demo Cloud'}
-                      </div>
-                    </div>
-                  )}
+                      {store.oledPage === 2 && (
+                        <div className="space-y-1">
+                          <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                            RECIPIENT REVIEW:
+                          </div>
+                          <div className="text-[11px] font-bold text-emerald-300 break-all leading-tight">
+                            {approval.recipientAddress}
+                          </div>
+                          <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
+                            ENTITY: {approval.merchantName}
+                          </div>
+                        </div>
+                      )}
 
-                  {store.oledPage === 3 && (
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
-                        CALLDATA DIGEST:
-                      </div>
-                      <div className="text-[10px] text-emerald-300 break-all leading-tight font-mono">
-                        {approval?.calldataDigest.slice(0, 36) || '0x22F100000000000000000000000000000000'}...
-                      </div>
-                      <div className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-1">
-                        TAP RFID &gt; PRESS GPIO 33
-                      </div>
-                    </div>
+                      {store.oledPage === 3 && (
+                        <div className="space-y-1">
+                          <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                            CALLDATA DIGEST:
+                          </div>
+                          <div className="text-[10px] text-emerald-300 break-all leading-tight font-mono">
+                            {approval.calldataDigest.slice(0, 36)}...
+                          </div>
+                          {store.rfidState === 'NO_CARD' ? (
+                            <div className="text-[9px] text-amber-400 font-bold uppercase tracking-wider mt-1 animate-pulse">
+                              [AWAITING NFC CARD PRESENTATION]
+                            </div>
+                          ) : (
+                            <div className="text-[9px] text-emerald-300 font-bold uppercase tracking-wider mt-1 bg-emerald-950/70 border border-emerald-800/80 px-1.5 py-0.5 rounded">
+                              ✓ NFC PRESENT: {store.rfidState === 'CARD_1_JUNIOR' ? 'JUNIOR ($2K CAP)' : 'SENIOR ($10K CAP)'} → READY TO SIGN
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Footer status on OLED */}
-                <div className="flex justify-between items-center text-[9px] text-emerald-600 border-t border-emerald-950 pt-1.5 mt-2">
-                  <span>RFID: {store.rfidState.replace('_', ' ')}</span>
-                  <span>{store.gpio33Approve ? 'SIG_READY' : 'WAITING_BTN'}</span>
+                <div className="flex justify-between items-center text-[9px] border-t border-emerald-950 pt-1.5 mt-2">
+                  <span className={store.rfidState === 'NO_CARD' ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                    RFID: {store.rfidState === 'NO_CARD' ? 'NO CARD' : store.rfidState === 'CARD_1_JUNIOR' ? 'CARD 1 (JUNIOR)' : 'CARD 2 (SENIOR)'}
+                  </span>
+                  <span className={store.rfidState !== 'NO_CARD' && approval ? 'text-emerald-300 font-bold' : 'text-emerald-600'}>
+                    {!approval ? 'IDLE' : store.rfidState === 'NO_CARD' ? 'WAITING_CARD' : store.gpio33Approve ? 'SIG_MINED' : 'READY_GPIO33'}
+                  </span>
                 </div>
               </div>
 
@@ -218,7 +260,8 @@ export const ApprovalsView: React.FC = () => {
                     <button
                       key={page}
                       onClick={() => store.setOledPage(page as 1 | 2 | 3)}
-                      className={`px-3 py-1 text-[11px] font-mono transition-all rounded-[8px] cursor-pointer ${
+                      disabled={!approval}
+                      className={`px-3 py-1 text-[11px] font-mono transition-all rounded-[8px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                         store.oledPage === page
                           ? 'glass-btn-primary font-bold shadow-sm'
                           : 'glass-btn text-white/70'
@@ -232,13 +275,15 @@ export const ApprovalsView: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => store.setOledPage(store.oledPage > 1 ? (store.oledPage - 1 as 1 | 2 | 3) : 3)}
-                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer"
+                    disabled={!approval}
+                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     ← PREV
                   </button>
                   <button
                     onClick={() => store.setOledPage(store.oledPage < 3 ? (store.oledPage + 1 as 1 | 2 | 3) : 1)}
-                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer"
+                    disabled={!approval}
+                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     NEXT →
                   </button>
@@ -255,9 +300,9 @@ export const ApprovalsView: React.FC = () => {
                     RC522 RFID Authorization Tier
                   </span>
                   <div className="flex items-center gap-1.5 font-mono text-[10px] text-white/90">
-                    <span className="w-1.5 h-1.5 rounded-none bg-emerald-400 inline-block" />
+                    <span className={`w-1.5 h-1.5 rounded-none inline-block ${store.rfidState === 'NO_CARD' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                     <span className="uppercase tracking-wider font-bold">
-                      {store.rfidState === 'NO_CARD' ? 'NO CARD' : store.rfidState === 'CARD_1_JUNIOR' ? 'CARD 1 (JUNIOR)' : 'CARD 2 (SENIOR)'}
+                      {store.rfidState === 'NO_CARD' ? 'NO CARD PRESENT' : store.rfidState === 'CARD_1_JUNIOR' ? 'CARD 1: JUNIOR (UID: A1B2C3D4)' : 'CARD 2: SENIOR (UID: E5F6G7H8)'}
                     </span>
                   </div>
                 </div>
@@ -268,7 +313,7 @@ export const ApprovalsView: React.FC = () => {
                     onClick={() => store.setRfidState('NO_CARD')}
                     className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'NO_CARD'
-                        ? 'glass-btn-primary font-bold'
+                        ? 'glass-btn-primary font-bold shadow-sm'
                         : 'glass-btn text-white/70'
                     }`}
                   >
@@ -278,45 +323,56 @@ export const ApprovalsView: React.FC = () => {
                     onClick={() => store.setRfidState('CARD_1_JUNIOR')}
                     className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'CARD_1_JUNIOR'
-                        ? 'glass-btn-primary font-bold'
+                        ? 'glass-btn-primary font-bold shadow-sm'
                         : 'glass-btn text-white/70'
                     }`}
                   >
-                    Tap Card 1
+                    Tap Card 1 (Junior)
                   </button>
                   <button
                     onClick={() => store.setRfidState('CARD_2_SENIOR')}
                     className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
                       store.rfidState === 'CARD_2_SENIOR'
-                        ? 'glass-btn-primary font-bold'
+                        ? 'glass-btn-primary font-bold shadow-sm'
                         : 'glass-btn text-white/70'
                     }`}
                   >
-                    Tap Card 2
+                    Tap Card 2 (Senior)
                   </button>
                 </div>
               </div>
 
               {/* GPIO Tactile Buttons */}
               <div className="space-y-2 pt-2">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium mb-1">
-                  Physical Tactile Key Switches
+                <div className="flex justify-between items-center text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium mb-1">
+                  <span>Physical Tactile Key Switches</span>
+                  {approval && store.rfidState === 'NO_CARD' && (
+                    <span className="text-amber-400 font-bold lowercase italic text-[10px]">
+                      * tap card above to enable approval
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {/* GPIO 33 Approve: Tinted Emerald Glass */}
+                  {/* GPIO 33 Approve */}
                   <button
                     onClick={handleApprove}
                     disabled={!approval}
-                    className="glass-status-emerald py-3 px-3 rounded-[8px] disabled:opacity-30 disabled:pointer-events-none text-emerald-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
+                    className={`py-3 px-3 rounded-[8px] font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center ${
+                      !approval
+                        ? 'opacity-30 pointer-events-none glass text-white/40'
+                        : store.rfidState === 'NO_CARD'
+                        ? 'border border-amber-500/60 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                        : 'glass-status-emerald text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)] hover:bg-emerald-900/50'
+                    }`}
                   >
-                    GPIO 33: Approve
+                    {store.rfidState === 'NO_CARD' ? 'GPIO 33: Tap Card First' : 'GPIO 33: Approve & Sign'}
                   </button>
 
                   {/* GPIO 32 Panic: Tinted Crimson Glass */}
                   <button
                     onClick={handlePanic}
-                    className="glass-status-crimson py-3 px-3 rounded-[8px] text-rose-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
+                    className="glass-status-crimson py-3 px-3 rounded-[8px] text-rose-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center hover:bg-rose-950/60"
                   >
                     GPIO 32: Panic
                   </button>
@@ -325,11 +381,12 @@ export const ApprovalsView: React.FC = () => {
 
               {/* Generated secp256k1 Signature Hex */}
               {store.deviceSignature && (
-                <div className="glass-well p-3 space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-emerald-300 font-bold">
-                    Generated secp256k1 Hardware Signature:
+                <div className="glass-well p-3 space-y-1.5 border border-emerald-500/30">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-emerald-300 font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-none inline-block" />
+                    <span>secp256k1 Hardware Signature Generated:</span>
                   </div>
-                  <div className="font-mono text-[10px] text-white/80 break-all">
+                  <div className="font-mono text-[10px] text-white/80 break-all bg-black/40 p-2 rounded border border-white/5">
                     {store.deviceSignature}
                   </div>
                 </div>
