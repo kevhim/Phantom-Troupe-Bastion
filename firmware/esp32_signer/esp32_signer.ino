@@ -242,8 +242,9 @@ void loop() {
             }
             break;
 
-        case STATE_AWAITING_APPROVE:
-            renderPage("CONFIRM SIGNING", "Role: " + scannedRole, "Hold APPROVE 1s", "Panic to cancel", "");
+        case STATE_AWAITING_APPROVE: {
+            String roleLine = "Role: " + scannedRole;
+            renderPage("CONFIRM SIGNING", roleLine.c_str(), "Hold APPROVE 1s", "Panic to cancel", "");
             if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
                 delay(1000); // Require 1-second sustained press
                 if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
@@ -251,6 +252,7 @@ void loop() {
                 }
             }
             break;
+        }
 
         case STATE_SIGNED:
             renderPage("DEVICE SIGNED", "EIP-712 Sig Created", "Low-s canonical", "Emitted to Host", "");

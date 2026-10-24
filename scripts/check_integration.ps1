@@ -1,19 +1,18 @@
-# BASTION X v2.2 — Cross-Laptop Network & Integration Diagnostic
+# BASTION X v2.3 — Cross-Laptop Network & Integration Diagnostic
 param(
     [string]$LaptopAIp = "127.0.0.1",
-    [string]$LaptopBIp = "127.0.0.1",
-    [string]$Esp8266Ip = ""
+    [string]$LaptopBIp = "127.0.0.1"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  BASTION X v2.2 — Cross-Laptop Integration Pre-Flight   " -ForegroundColor Cyan
+Write-Host "  BASTION X v2.3 — Cross-Laptop Integration Pre-Flight   " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Test Laptop A API
 Write-Host "`n[1/3] Testing Laptop A Application API ($LaptopAIp:8000)..." -ForegroundColor Yellow
 try {
     $api = Invoke-RestMethod -Uri "http://${LaptopAIp}:8000/api/v2/overview" -TimeoutSec 3
-    Write-Host "  [OK] Laptop A API is reachable. Total Events: $($api.total_forensic_events)" -ForegroundColor Green
+    Write-Host "  [OK] Laptop A API is reachable. Total Forensic Events: $($api.total_forensic_events)" -ForegroundColor Green
 } catch {
     Write-Host "  [FAIL] Cannot reach Laptop A API: $_" -ForegroundColor Red
 }
@@ -28,17 +27,13 @@ try {
     Write-Host "  [FAIL] Cannot reach Laptop B Anvil RPC: $_" -ForegroundColor Red
 }
 
-# 3. Test ESP8266 Alert Node if IP supplied
-if ($Esp8266Ip) {
-    Write-Host "`n[3/3] Testing ESP8266 Alert Node ($Esp8266Ip:80)..." -ForegroundColor Yellow
-    try {
-        $alert = Invoke-RestMethod -Uri "http://${Esp8266Ip}:80/health" -TimeoutSec 3
-        Write-Host "  [OK] ESP8266 Alert Node is reachable. Status: $($alert.status)" -ForegroundColor Green
-    } catch {
-        Write-Host "  [WARN] ESP8266 Alert Node not responding: $_" -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "`n[3/3] ESP8266 IP not specified, skipping Wi-Fi buzzer ping." -ForegroundColor Gray
+# 3. Test Laptop B Supervisor Service & Uno #1 Buzzer
+Write-Host "`n[3/3] Testing Laptop B Supervisor API ($LaptopBIp:8005)..." -ForegroundColor Yellow
+try {
+    $sup = Invoke-RestMethod -Uri "http://${LaptopBIp}:8005/supervisor/health" -TimeoutSec 3
+    Write-Host "  [OK] Laptop B Supervisor reachable. Signer: $($sup.peripherals.esp32_signer), Uno #1 Buzzer: $($sup.peripherals.uno_buzzer)" -ForegroundColor Green
+} catch {
+    Write-Host "  [WARN] Supervisor API not responding on port 8005 (Supervisor may not be running): $_" -ForegroundColor Yellow
 }
 
-Write-Host "`nPre-flight diagnostics completed!" -ForegroundColor Cyan
+Write-Host "`nPre-flight diagnostics completed! (ESP8266 removed in v2.3; buzzer verified on Uno #1 Pin D8)" -ForegroundColor Cyan

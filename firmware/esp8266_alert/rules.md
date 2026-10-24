@@ -1,9 +1,9 @@
-# Local rules — `firmware/esp8266_alert` (BASTION X v2.2)
+# Local rules — `firmware/esp8266_alert` (ARCHIVED in BASTION X v2.3)
 
-Read `/PROJECT_MASTER.md`, `/AGENTS.md`, and ancestor `rules.md` files first. Read this directory's domain specification before implementing.
+Read `/PROJECT_MASTER.md`, `/AGENTS.md`, and ancestor `rules.md` files first.
 
-**Directory scope:**
-- Owned by: Powered via USB on Laptop A (RTX 5060), but belongs to the security alert broadcast domain controlled by Laptop B (Intel Ultra 7).
-- Hardware: ESP8266 NodeMCU with active buzzer on D1 (GPIO 5) and status LED on D4 (GPIO 2).
-- Purpose: Remote audio/visual alarm triggered directly over Wi-Fi when a physical panic or hardware tamper event occurs on Laptop B.
-- Security restriction: Strictly FORBIDDEN from authorizing payments or issuing signatures. Never route alerts through Laptop A's application backend.
+**Directory scope & Status:**
+- **ARCHIVED (v2.3):** The ESP8266 is NO LONGER a required or active hardware dependency.
+- In BASTION X v2.3, the 5V active buzzer was reassigned to **Arduino Uno #1 (Digital Pin D8)** on Laptop B (Intel Core Ultra 7 155H), controlled directly by the Supervisor Service.
+- This directory is retained for archival, testing, and historical reference only.
+- Services and deployment scripts MUST NEVER block or fail due to a missing ESP8266.
