@@ -11,6 +11,10 @@ import uuid
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional, Tuple
 import os
+import re
+import threading
+import functools
+import httpx
 
 try:
     from services.api.src.database import SessionLocal, AuditEntryRecord, IntegrityCheckpointRecord
@@ -58,13 +62,22 @@ def compute_event_hash(previous_hash: str, canonical_json: str) -> str:
     return h.hexdigest()
 
 
+def serialized(method):
+    @functools.wraps(method)
+    def call(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return call
+
+
 class FlightRecorder:
     def __init__(
         self,
         node_id: str = "laptop-a-main",
         checkpoint_storage_dir: Optional[str] = None,
-        auto_persist_db: bool = True,
+        auto_persist_db: bool = False,
     ):
+        self._lock = threading.RLock()
         self.node_id = node_id
         self.events: List[ForensicEvent] = []
         self.last_event_hash: str = GENESIS_HASH
@@ -76,6 +89,22 @@ class FlightRecorder:
             os.makedirs(self.checkpoint_storage_dir, exist_ok=True)
         except Exception:
             pass
+
+    @serialized
+    def restore(self):
+        """Resume the verified persistent chain on API startup, single worker only."""
+        if not self.auto_persist_db:
+            return
+        with SessionLocal() as db:
+            entries = db.query(AuditEntryRecord).order_by(AuditEntryRecord.sequence.asc()).all()
+            events = [ForensicEvent(e.event_id, 2, e.timestamp, e.event_source, e.correlation_id,
+                e.event_type, json.loads(e.sanitized_payload_json), e.prev_hash, e.entry_hash, e.sequence)
+                for e in entries]
+        valid, msg, _ = self.verify_event_chain(events)
+        if not valid or any(e.sequence != i + 1 for i, e in enumerate(events)):
+            raise RuntimeError(f"Stored audit trail invalid: {msg}")
+        self.events = events
+        self.last_event_hash = events[-1].current_event_hash if events else GENESIS_HASH
 
     def sanitize_payload(self, raw_payload: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -97,6 +126,7 @@ class FlightRecorder:
                 clean[k] = v
         return clean
 
+    @serialized
     def record_event(
         self,
         event_source: str,
@@ -130,9 +160,6 @@ class FlightRecorder:
         current_hash = compute_event_hash(self.last_event_hash, canonical_json)
         temp_event.current_event_hash = current_hash
 
-        self.events.append(temp_event)
-        self.last_event_hash = current_hash
-
         # Persist to SQLite audit_entries if enabled
         if self.auto_persist_db and SessionLocal and AuditEntryRecord:
             try:
@@ -153,17 +180,24 @@ class FlightRecorder:
                     db.commit()
                 finally:
                     db.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                raise RuntimeError("Audit persistence failed; event was not accepted") from exc
 
+        self.events.append(temp_event)
+        self.last_event_hash = current_hash
         return temp_event
 
+    @serialized
     def create_checkpoint(self, checkpoint_id: str, export_laptop_b: bool = True) -> Dict[str, Any]:
         """
         Generates an independent periodic checkpoint designed to be stored
         on Laptop B outside of the application's writable database.
         """
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,96}", checkpoint_id):
+            raise ValueError("Invalid checkpoint ID")
         chain_valid, _, _ = self.verify_event_chain(self.events)
+        if not chain_valid:
+            raise ValueError("Cannot checkpoint corrupted evidence")
         checkpoint_data = {
             "checkpoint_id": checkpoint_id,
             "created_at_utc": time.time(),
@@ -183,18 +217,26 @@ class FlightRecorder:
         except Exception:
             pass
 
-        # Independent export for Intel Laptop B
+        # A local filesystem path on A is never independent Laptop B evidence.
         exported_path = file_path
+        checkpoint_data["independent_status"] = "NOT_REQUESTED"
         if export_laptop_b:
+            checkpoint_data["independent_status"] = "UNAVAILABLE"
+            url = os.getenv("SUPERVISOR_URL", "").rstrip("/")
+            token = os.getenv("CHECKPOINT_TOKEN", "")
             try:
-                os.makedirs(self.laptop_b_checkpoint_dir, exist_ok=True)
-                b_path = os.path.join(self.laptop_b_checkpoint_dir, f"{checkpoint_id}.json")
-                with open(b_path, "w", encoding="utf-8") as f:
-                    json.dump(checkpoint_data, f, indent=2)
-                exported_path = b_path
-            except Exception:
-                # If C:\ root is not writable, fallback to local path
-                exported_path = file_path
+                if not url or not token:
+                    raise ValueError("SUPERVISOR_URL and CHECKPOINT_TOKEN must be configured")
+                response = httpx.post(url + "/supervisor/audit/checkpoint", json=checkpoint_data,
+                    headers={"Authorization": f"Bearer {token}"}, timeout=3)
+                response.raise_for_status()
+                saved = response.json()
+                if saved.get("status") != "PRESERVED" or saved.get("checkpoint_id") != checkpoint_id:
+                    raise ValueError("Supervisor did not acknowledge this checkpoint")
+                checkpoint_data["independent_status"] = "PRESERVED_ON_B"
+                exported_path = saved["path"]
+            except Exception as exc:
+                checkpoint_data["independent_error"] = str(exc)
 
         checkpoint_data["export_path"] = exported_path
 
@@ -298,6 +340,8 @@ class FlightRecorder:
         Verifies that current flight recorder matches an independent checkpoint held on Laptop B.
         """
         expected_count = checkpoint_data["event_count"]
+        if type(expected_count) is not int or expected_count < 0:
+            return False, "Invalid checkpoint event count"
         expected_tip = checkpoint_data["tip_event_hash"]
 
         if len(self.events) < expected_count:
@@ -309,8 +353,9 @@ class FlightRecorder:
         if not valid:
             return False, f"Chain corrupted before checkpoint: {msg}"
 
-        if slice_events[-1].current_event_hash != expected_tip:
-            return False, f"Tip hash mismatch: slice tip is {slice_events[-1].current_event_hash}, checkpoint expects {expected_tip}"
+        actual_tip = slice_events[-1].current_event_hash if slice_events else GENESIS_HASH
+        if actual_tip != expected_tip:
+            return False, f"Tip hash mismatch: slice tip is {actual_tip}, checkpoint expects {expected_tip}"
 
         return True, f"Flight recorder strictly conforms to checkpoint {checkpoint_data['checkpoint_id']}"
 
@@ -325,6 +370,9 @@ class FlightRecorder:
             "correlation_id": correlation_id,
             "total_events": len(matched_events),
             "timeline": matched_events,
+            "verification_events": [asdict(e) for e in self.events],
+            "checkpoints": list(self.checkpoints.values()),
+            "independent_validation": "Fetch the original checkpoint directly from Laptop B; this export alone is not a trusted anchor",
             "tip_event_hash": self.last_event_hash,
             "chain_integrity": self.verify_event_chain(self.events)[0],
         }

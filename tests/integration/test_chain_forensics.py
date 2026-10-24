@@ -58,6 +58,10 @@ ENTRY_POINT = deployments["entryPoint"]
 @pytest.fixture(autouse=True)
 def ensure_database():
     init_db()
+    if not blockchain_client.agent_key:
+        blockchain_client.agent_key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+    from services.api.src.routes import api_v2
+    api_v2.flight_rec = FlightRecorder()
 
 
 def ensure_anvil_daily_quota(required_busd: float = 20.0):
@@ -225,8 +229,15 @@ def test_6_transaction_revert():
         },
     }
 
+    from services.bundler.user_op_client import user_op_to_tuple
+
+    def mock_send(bundler_url, user_op, entry_point_address):
+        op_tuple = user_op_to_tuple(user_op)
+        h = blockchain_client.ep_contract.functions.getUserOpHash(op_tuple).call()
+        return "0x" + h.hex()
+
     with patch("services.api.src.blockchain.wait_for_user_op_receipt", return_value=mock_reverted_receipt):
-        with patch("services.api.src.blockchain.send_user_op", return_value="0xreverted_op_hash_123"):
+        with patch("services.api.src.blockchain.send_user_op", side_effect=mock_send):
             res = blockchain_client.submit_agent_payment_user_op(
                 recipient=ALLOWED_VENDOR,
                 amount=50 * 10**6,

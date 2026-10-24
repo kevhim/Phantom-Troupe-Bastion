@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LiveAcceptance from './LiveAcceptance';
 import {
   Shield,
   Cpu,
@@ -43,7 +44,7 @@ import {
   CircuitBreakerState
 } from './types';
 
-export default function App() {
+function SimulationConsole() {
   const [currentRoute, setCurrentRoute] = useState<RouteId>('overview');
   const [overallHealth, setOverallHealth] = useState<HardwareHealthState>('HEALTHY');
   const [revocationState, setRevocationState] = useState<RevocationState>('IDLE');
@@ -1951,4 +1952,17 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const [simulation, setSimulation] = useState(false);
+  return <>
+    <div style={{ background: simulation ? '#78350f' : '#0f172a', color: '#fff', padding: '10px 20px' }}>
+      <strong>{simulation ? 'SIMULATION: all dashboard values, approvals, attacks and receipts below are synthetic.' : 'LOCAL TESTNET: live API results; hardware acceptance remains unverified.'}</strong>
+      <button style={{ marginLeft: 20 }} onClick={() => setSimulation(!simulation)}>
+        {simulation ? 'Return to live acceptance' : 'Open labeled simulation console'}
+      </button>
+    </div>
+    {simulation ? <SimulationConsole /> : <LiveAcceptance />}
+  </>;
 }

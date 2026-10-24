@@ -20,6 +20,11 @@ def ensure_clean_session_state():
             blockchain_client.w3.provider.make_request("evm_increaseTime", [86400])
             blockchain_client.w3.provider.make_request("evm_mine", [])
             blockchain_client.unfreeze_session_on_chain()
+        if not blockchain_client.agent_key:
+            blockchain_client.agent_key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+        from services.api.src.routes import api_v2
+        from services.api.src.evidence.flight_recorder import FlightRecorder
+        api_v2.flight_rec = FlightRecorder()
     except Exception:
         pass
 
@@ -68,7 +73,7 @@ def test_out_of_policy_payment_queues_for_physical_review():
     payload = {
         "recipient": "0x00000000000000000000000000000000000000cc",
         "amount": 250 * 10**6,  # 250 bUSD (> 50 max_per_tx)
-        "order_id": "ord-integration-02",
+        "order_id": f"ord-integration-02-{int(time.time()*1000)}",
         "prompt_context": "Large purchase requiring physical review",
     }
     response = client.post("/api/v2/payments/request", json=payload)
@@ -93,7 +98,7 @@ def test_hardware_health_disconnect_and_recovery():
     payload = {
         "recipient": "0x00000000000000000000000000000000000000cc",
         "amount": 300 * 10**6,
-        "order_id": "ord-fail-closed",
+        "order_id": f"ord-fail-closed-{int(time.time()*1000)}",
     }
     res = client.post("/api/v2/payments/request", json=payload)
     assert res.status_code == 403

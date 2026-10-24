@@ -9,6 +9,7 @@ Listens on port 3000. Provides standard ERC-4337 JSON-RPC endpoints:
 """
 
 import json
+import os
 import logging
 import sys
 from pathlib import Path
@@ -30,9 +31,9 @@ logger = logging.getLogger("bundler")
 DEPLOYMENTS_FILE = REPO_ROOT / "contracts" / "deployments.json"
 OUT_DIR = REPO_ROOT / "contracts" / "out"
 
-ANVIL_RPC = "http://127.0.0.1:8545"
+ANVIL_RPC = os.getenv("CHAIN_RPC_URL", "http://127.0.0.1:8545")
 # Anvil account #5: Bundler Relayer & Beneficiary
-BUNDLER_KEY = "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba"
+BUNDLER_KEY = os.getenv("BUNDLER_PRIVATE_KEY", "")
 
 app = FastAPI(title="BastionX ERC-4337 Bundler", version="2.3.0")
 
@@ -44,7 +45,7 @@ USER_OP_REVERT_TOPIC = "0x1c4fada7374c0a9ee8841fc38afe82932dc0f8e69012e927f061a8
 
 
 def get_web3() -> Web3:
-    return Web3(Web3.HTTPProvider(ANVIL_RPC))
+    return Web3(Web3.HTTPProvider(ANVIL_RPC, request_kwargs={"timeout": 3}))
 
 
 def load_entry_point():
@@ -173,6 +174,8 @@ async def rpc_endpoint(request: Request):
             user_op_tuple = format_user_op_tuple(user_op_dict)
 
             w3 = get_web3()
+            if not BUNDLER_KEY:
+                raise RuntimeError("BUNDLER_PRIVATE_KEY must be provisioned on Laptop B")
             bundler_account = Account.from_key(BUNDLER_KEY)
             beneficiary = deployments.get("bundlerBeneficiary", bundler_account.address)
 
@@ -237,9 +240,9 @@ async def rpc_endpoint(request: Request):
                 "success": success,
                 "revertReason": revert_reason,
                 "receipt": {
-                    "transactionHash": tx_receipt.transactionHash.hex(),
+                    "transactionHash": Web3.to_hex(tx_receipt.transactionHash),
                     "transactionIndex": hex(tx_receipt.transactionIndex),
-                    "blockHash": tx_receipt.blockHash.hex(),
+                    "blockHash": Web3.to_hex(tx_receipt.blockHash),
                     "blockNumber": hex(tx_receipt.blockNumber),
                     "from": tx_receipt["from"],
                     "to": tx_receipt["to"],

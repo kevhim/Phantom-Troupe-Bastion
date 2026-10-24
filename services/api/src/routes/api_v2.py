@@ -6,7 +6,7 @@ verifiable flight recorder, smart-account policies, and Mirage deception layer.
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import time
@@ -14,11 +14,13 @@ import os
 import json
 import uuid
 import hashlib
+from web3 import Web3
 
 from services.device_crypto.crypto_engine import (
     PaymentIntent,
     compute_calldata_hash,
-    sign_payment_intent,
+    compute_eip712_digest,
+    build_eip712_structured_data,
     verify_dual_authorization,
     JUNIOR_ROLE_CAP,
     SENIOR_ROLE_CAP,
@@ -49,7 +51,7 @@ router = APIRouter(prefix="/api/v2")
 
 # Shared Application State
 health_mgr = HardwareHealthManager()
-flight_rec = FlightRecorder(node_id="laptop-a-main")
+flight_rec = FlightRecorder(node_id="laptop-a-main", auto_persist_db=True)
 mirage = MirageEngine(flight_recorder=flight_rec)
 
 # Configured Policy State (Synchronized with live deployment manifest)
@@ -99,8 +101,15 @@ if blockchain_client.is_connected():
 # --- Request/Response Models ---
 class PaymentRequest(BaseModel):
     recipient: str
-    amount: int  # base units (6 decimals)
-    order_id: str
+    amount: int = Field(gt=0, le=10_000_000_000, strict=True)  # fixed device ceiling
+    order_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+    @field_validator("recipient")
+    @classmethod
+    def validate_recipient(cls, value):
+        if not Web3.is_address(value):
+            raise ValueError("recipient must be an Ethereum address")
+        return Web3.to_checksum_address(value)
     prompt_context: Optional[str] = "Agent automated payment"
 
 
@@ -108,7 +117,7 @@ class ExceptionReviewSubmission(BaseModel):
     request_id: str
     approval_tier: str  # "JUNIOR_EXCEPTION" or "SENIOR_EXCEPTION"
     device_signature_hex: str
-    owner_signature_hex: Optional[str] = None
+    owner_signature_hex: str
 
 
 class DisconnectRequest(BaseModel):
@@ -184,7 +193,16 @@ def get_overview():
 # --- Payments Route ---
 @router.post("/payments/request")
 def request_payment(req: PaymentRequest):
-    now = int(time.time())
+    onchain = blockchain_client.get_on_chain_policy()
+    if not onchain.get("connected"):
+        raise HTTPException(status_code=503, detail="Live chain policy unavailable; no payment submitted")
+    for attr, key in (("wallet_address", "wallet_address"), ("owner_address", "owner_address"),
+                      ("agent_session_key", "agent_session_key"), ("allowed_target", "allowed_target"),
+                      ("allowed_recipient", "allowed_recipient"), ("max_per_tx", "max_per_tx"),
+                      ("daily_allowance", "daily_allowance"), ("policy_version", "policy_version"),
+                      ("account_nonce", "account_nonce")):
+        setattr(policy_state, attr, onchain[key])
+    now = int(blockchain_client.w3.eth.get_block("latest")["timestamp"])
     prompt_str = req.prompt_context or "Agent automated payment"
     prompt_digest = hashlib.sha256(prompt_str.encode("utf-8")).hexdigest()
 
@@ -223,8 +241,10 @@ def request_payment(req: PaymentRequest):
     try:
         db.add(intent_record)
         db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        db.close()
+        raise HTTPException(status_code=409, detail="Order already exists or could not be persisted") from exc
 
     # 2. Check On-Chain Session State & 6 Policies
     session_valid, session_msg = blockchain_client.check_agent_session_valid()
@@ -238,7 +258,6 @@ def request_payment(req: PaymentRequest):
     valid_recipients = {
         policy_state.allowed_recipient.lower(),
         blockchain_client.deployments.get("allowedVendor", "").lower(),
-        LEGACY_MOCK_VENDOR.lower(),
     }
     is_recipient_ok = req.recipient.lower() in valid_recipients
     is_amount_ok = req.amount <= policy_state.max_per_tx
@@ -265,7 +284,7 @@ def request_payment(req: PaymentRequest):
         intent = PaymentIntent(
             chainId=policy_state.chain_id,
             verifyingAccount=policy_state.wallet_address,
-            accountNonce=policy_state.account_nonce + 1,
+            accountNonce=policy_state.account_nonce,
             requestId=req_id,
             policyVersion=policy_state.policy_version,
             actorSession=policy_state.agent_session_key,
@@ -275,7 +294,7 @@ def request_payment(req: PaymentRequest):
             functionSelector="0xa9059cbb",
             recipientAddress=req.recipient,
             amountBaseUnits=req.amount,
-            maxPerTxException=JUNIOR_ROLE_CAP if req.amount <= JUNIOR_ROLE_CAP else SENIOR_ROLE_CAP,
+            maxPerTxException=req.amount,
             deadline=now + 300,
             calldataHash=calldata_hash,
         )
@@ -319,6 +338,8 @@ def request_payment(req: PaymentRequest):
             "request_id": req_id,
             "approval_tier": intent.approvalTier,
             "canonical_intent": intent.to_dict(),
+            "typed_data": build_eip712_structured_data(intent),
+            "digest": Web3.to_hex(compute_eip712_digest(intent)),
             "note": "Requires physical OLED review, RFID scan, GPIO33 confirmation, and Owner co-signature",
         }
 
@@ -343,17 +364,17 @@ def request_payment(req: PaymentRequest):
         intent_record.status = final_status
         userop_record = UserOperationRecord(
             order_id=req.order_id,
-            userop_hash=userop_hash or f"0x{os.urandom(32).hex()}",
+            userop_hash=userop_hash,
             sender=policy_state.wallet_address,
             nonce=hex(policy_state.account_nonce),
-            call_data=res.get("signed_op", {}).get("callData", ""),
+            call_data=(res.get("signed_op") or {}).get("callData", ""),
             call_gas_limit="0x55730",
             verification_gas_limit="0x493e0",
             pre_verification_gas="0xc350",
             max_fee_per_gas="0x77359400",
             max_priority_fee_per_gas="0x3b9aca00",
             paymaster_and_data="0x",
-            signature=res.get("signed_op", {}).get("signature", ""),
+            signature=(res.get("signed_op") or {}).get("signature", ""),
             bundler_status=final_status,
             tx_hash=tx_hash,
             block_number=block_num,
@@ -507,114 +528,55 @@ def get_approval_queue():
 
 @router.post("/approvals/execute")
 def execute_exception_approval(sub: ExceptionReviewSubmission):
-    if sub.request_id not in health_mgr.active_approvals:
-        raise HTTPException(status_code=404, detail="Approval request not found")
-
-    req_data = health_mgr.active_approvals[sub.request_id]
-    if req_data["status"] == ApprovalRequestStatus.CANCELLED:
-        raise HTTPException(status_code=400, detail=f"Approval request was cancelled: {req_data.get('cancellation_reason')}")
-
-    intent_dict = req_data["intent"]
-    intent = PaymentIntent(**intent_dict)
-    now = int(time.time())
-
-    # Execute on policy engine
-    ok, msg = policy_state.execute_authorized_exception(
-        intent=intent,
-        device_signature_hex=sub.device_signature_hex,
-        owner_signature_hex=sub.owner_signature_hex,
-        timestamp=now,
-    )
-
-    if not ok:
-        raise HTTPException(status_code=400, detail=f"On-chain exception verification failed: {msg}")
-
-    tx_hash = None
-    if blockchain_client.is_connected() and blockchain_client.bastion_contract:
-        try:
-            from web3 import Web3
-            from eth_account import Account
-            intent_tuple = (
-                intent.chainId,
-                Web3.to_checksum_address(intent.verifyingAccount),
-                intent.accountNonce,
-                intent.requestId,
-                intent.policyVersion,
-                intent.actorSession,
-                intent.approvalTier,
-                Web3.to_checksum_address(intent.tokenAddress),
-                Web3.to_checksum_address(intent.targetContract),
-                bytes.fromhex(intent.functionSelector[2:] if intent.functionSelector.startswith("0x") else intent.functionSelector),
-                Web3.to_checksum_address(intent.recipientAddress),
-                intent.amountBaseUnits,
-                intent.maxPerTxException,
-                intent.deadline,
-                bytes.fromhex(intent.calldataHash[2:] if intent.calldataHash.startswith("0x") else intent.calldataHash),
-            )
-            dev_sig = bytes.fromhex(sub.device_signature_hex[2:] if sub.device_signature_hex.startswith("0x") else sub.device_signature_hex)
-            own_sig = bytes.fromhex(sub.owner_signature_hex[2:] if sub.owner_signature_hex and sub.owner_signature_hex.startswith("0x") else (sub.owner_signature_hex or ""))
-
-            owner_acct = Account.from_key(blockchain_client.owner_key)
-            nonce = blockchain_client.w3.eth.get_transaction_count(owner_acct.address)
-            tx = blockchain_client.bastion_contract.functions.executeAuthorizedException(
-                intent_tuple, dev_sig, own_sig
-            ).build_transaction({
-                "from": owner_acct.address,
-                "nonce": nonce,
-                "gas": 400000,
-                "gasPrice": blockchain_client.w3.eth.gas_price,
-            })
-            signed_tx = blockchain_client.w3.eth.account.sign_transaction(tx, private_key=blockchain_client.owner_key)
-            sent_tx = blockchain_client.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-            rcpt = blockchain_client.w3.eth.wait_for_transaction_receipt(sent_tx, timeout=10.0)
-            if rcpt.status == 1:
-                tx_hash = sent_tx.hex()
-        except Exception as e:
-            logger.warning(f"On-chain exception submission fallback: {e}")
-
-    req_data["status"] = ApprovalRequestStatus.CONFIRMED
-
-    # Update database records
-    db = SessionLocal()
+    req_data = health_mgr.active_approvals.get(sub.request_id)
+    if not req_data:
+        raise HTTPException(status_code=404, detail="Approval request not found; requests require fresh review after restart")
+    if req_data["status"] != ApprovalRequestStatus.DEVICE_REVIEW:
+        raise HTTPException(status_code=409, detail="Request already resolved, submitted, or cancelled")
+    intent = PaymentIntent(**req_data["intent"])
+    if sub.approval_tier != intent.approvalTier:
+        raise HTTPException(status_code=400, detail="Tier differs from reviewed intent")
+    chain = blockchain_client
+    if not chain.is_connected() or not chain.bastion_contract:
+        raise HTTPException(status_code=503, detail="Chain unavailable; approval not executed")
+    now = chain.w3.eth.get_block("latest")["timestamp"]
     try:
-        appr_rec = db.query(ApprovalRequestRecord).filter_by(request_id=sub.request_id).first()
-        if appr_rec:
-            appr_rec.status = "CONFIRMED"
-            appr_rec.esp32_signature = sub.device_signature_hex
-            appr_rec.owner_cosign = sub.owner_signature_hex
-            appr_rec.resolved_utc = datetime.utcnow()
-
-        p_intent = db.query(PaymentIntentRecord).filter_by(order_id=intent.requestId.replace("exc-", "")).first()
-        if p_intent:
-            p_intent.status = "INCLUDED_SUCCESS"
-
-        db.commit()
-    except Exception:
-        db.rollback()
-    finally:
-        db.close()
-
-    flight_rec.record_event(
-        event_source="WALLET",
-        correlation_id=sub.request_id,
-        event_type="wallet.exception_executed",
-        payload={
-            "request_id": sub.request_id,
-            "amount": intent.amountBaseUnits,
-            "recipient": intent.recipientAddress,
-            "status": "CONFIRMED",
-            "tx_hash": tx_hash,
-        },
-    )
-
-    return {
-        "status": "CONFIRMED",
-        "message": "Exception authorized and executed on-chain",
-        "request_id": sub.request_id,
-        "amount": intent.amountBaseUnits,
-        "recipient": intent.recipientAddress,
-        "tx_hash": tx_hash,
-    }
+        ok, msg = verify_dual_authorization(
+            intent, sub.device_signature_hex, sub.owner_signature_hex,
+            chain.bastion_contract.functions.juniorExceptionSigner().call(),
+            chain.bastion_contract.functions.seniorExceptionSigner().call(),
+            chain.bastion_contract.functions.owner().call(), now)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Cannot verify current signer configuration") from exc
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    req_data["status"] = ApprovalRequestStatus.SUBMITTED
+    result = chain.submit_agent_payment_user_op(
+        intent.recipientAddress, intent.amountBaseUnits, intent.requestId,
+        exception_intent=intent, device_signature=sub.device_signature_hex,
+        owner_signature=sub.owner_signature_hex)
+    confirmed = result["status"] == "INCLUDED_SUCCESS"
+    req_data["status"] = ApprovalRequestStatus.CONFIRMED if confirmed else ApprovalRequestStatus.SUBMITTED
+    req_data["execution"] = {k: v for k, v in result.items() if k != "signed_op"}
+    with SessionLocal() as db:
+        approval = db.query(ApprovalRequestRecord).filter_by(request_id=sub.request_id).first()
+        if approval:
+            approval.status = result["status"]
+            approval.esp32_signature = sub.device_signature_hex
+            approval.owner_cosign = sub.owner_signature_hex
+            approval.resolved_utc = datetime.utcnow() if confirmed else None
+            payment = db.query(PaymentIntentRecord).filter_by(order_id=approval.order_id).first()
+            if payment:
+                payment.status = result["status"]
+            op = result.get("signed_op") or {}
+            db.add(UserOperationRecord(order_id=approval.order_id, userop_hash=result.get("userop_hash"),
+                sender=intent.verifyingAccount, nonce=op.get("nonce"), call_data=op.get("callData"),
+                signature=op.get("signature"), bundler_status=result["status"], tx_hash=result.get("tx_hash"),
+                block_number=result.get("block_number"), execution_success=confirmed,
+                actual_gas_used=result.get("actual_gas_used"), revert_reason=result.get("revert_reason")))
+            db.commit()
+    flight_rec.record_event("WALLET", sub.request_id, "wallet.exception_result", req_data["execution"])
+    return req_data["execution"]
 
 
 # --- Hardware Routes & Replay Protection ---
@@ -704,67 +666,47 @@ def supervisor_recovery(req: RecoveryRequest):
 
 
 @router.post("/hardware/panic")
-def trigger_panic(origin: str = "ESP32_GPIO32_DIRECT"):
-    # 1. Hardware latches PANIC_LOCAL
-    details = health_mgr.trigger_panic(origin)
+def trigger_panic():
+    # An HTTP request is an application stop request, never proof of GPIO input.
+    details = health_mgr.trigger_panic("APPLICATION_REQUEST")
+    health_mgr.update_revocation_progress(RevocationState.REVOKE_UNAVAILABLE)
+    flight_rec.record_event("INCIDENT_RESPONSE", f"panic-{uuid.uuid4().hex}",
+                            "incident.application_stop_requested", details)
+    return {"status": "PANIC_LOCAL", "origin": "APPLICATION_REQUEST",
+            "chain_state": "REVOKE_UNAVAILABLE", "tx_hash": None,
+            "message": "Press physical ESP32 panic or use independent owner wallet; no chain revocation submitted by Laptop A"}
 
-    # 2. Record in flight recorder
-    flight_rec.record_event(
-        event_source="INCIDENT_RESPONSE",
-        correlation_id=f"panic-{int(time.time())}",
-        event_type="incident.panic_triggered",
-        payload=details,
-    )
 
-    # 3. Genuine On-Chain Revocation via revokerRole / owner on Anvil
-    health_mgr.update_revocation_progress(RevocationState.REVOKE_SUBMITTED)
-    real_revocation = blockchain_client.revoke_session_on_chain(
-        agent_address=policy_state.agent_session_key,
-        reason="PHYSICAL_GPIO32_PANIC",
-    )
+class RevocationReceiptSubmission(BaseModel):
+    tx_hash: str = Field(pattern=r"^0x[0-9a-fA-F]{64}$")
 
-    tx_hash = real_revocation.get("tx_hash") or f"0xpanic_{int(time.time())}"
-    block_number = real_revocation.get("block_number")
 
-    policy_state.revoke_session(policy_state.agent_session_key, policy_state.revoker_role, "PHYSICAL_GPIO32_PANIC")
-    health_mgr.update_revocation_progress(RevocationState.REVOKE_CONFIRMED, tx_hash=tx_hash)
-
-    # Persist IncidentRecord and update AgentSessionRecord in DB
-    db = SessionLocal()
+@router.post("/hardware/revocation/confirm")
+def confirm_revocation(sub: RevocationReceiptSubmission):
+    chain = blockchain_client
+    if not chain.is_connected() or not chain.bastion_contract:
+        raise HTTPException(status_code=503, detail="Chain unavailable")
+    sid = Web3.solidity_keccak(["address"], [policy_state.agent_session_key])
     try:
-        incident = IncidentRecord(
-            incident_id=f"inc-panic-{int(time.time())}",
-            trigger="PHYSICAL_PANIC_GPIO32",
-            state="REVOCATION_CONFIRMED",
-            physical_panic_utc=datetime.utcnow(),
-            revocation_tx=tx_hash,
-            revocation_confirmed_block=block_number,
-            details_json=json.dumps(details),
-        )
-        db.add(incident)
-
-        agent_sess = db.query(AgentSessionRecord).filter_by(session_key_address=policy_state.agent_session_key).first()
-        if agent_sess:
-            agent_sess.is_revoked = True
-            agent_sess.revocation_reason = "PHYSICAL_GPIO32_PANIC"
-            agent_sess.revoked_at_utc = datetime.utcnow()
-            agent_sess.revocation_tx_hash = tx_hash
-            agent_sess.revocation_block = block_number
-
-        db.commit()
-    except Exception:
-        db.rollback()
-    finally:
-        db.close()
-
-    return {
-        "status": "PANIC_CONFIRMED",
-        "local_state": RevocationState.PANIC_LOCAL.value,
-        "chain_state": RevocationState.REVOKE_CONFIRMED.value,
-        "tx_hash": tx_hash,
-        "block_number": block_number,
-        "message": "Session revoked on-chain via independent revoker key",
-    }
+        receipt = chain.w3.eth.get_transaction_receipt(sub.tx_hash)
+        events = []
+        for log in receipt["logs"]:
+            if log["address"].lower() == chain.bastion_contract.address.lower():
+                try:
+                    events.append(chain.bastion_contract.events.SessionRevoked().process_log(log)["args"])
+                except Exception:
+                    pass
+        if receipt["status"] != 1 or not any(e["sessionId"] == sid for e in events):
+            raise ValueError("No matching SessionRevoked event")
+        if not chain.bastion_contract.functions.revokedSessions(sid).call():
+            raise ValueError("Session is not revoked")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Revocation not confirmed for this session") from exc
+    health_mgr.update_revocation_progress(RevocationState.REVOKE_CONFIRMED, tx_hash=sub.tx_hash)
+    result = {"status": "REVOKE_CONFIRMED", "tx_hash": sub.tx_hash, "block_number": receipt["blockNumber"],
+              "session_id": Web3.to_hex(sid), "provenance": "onchain_confirmed"}
+    flight_rec.record_event("WALLET", sub.tx_hash, "wallet.session_revoked", result)
+    return result
 
 
 # --- Agent Session State Route ---
@@ -1219,18 +1161,12 @@ def get_circuit_breaker_state():
 
 @router.post("/circuit-breaker/freeze")
 def manual_freeze_session(reason: str = "Operator manual lockdown"):
-    circuit_breaker_telemetry["state"] = "FROZEN_MANUAL"
-    circuit_breaker_telemetry["last_freeze_reason"] = reason
-    blockchain_client.freeze_session_on_chain(reason=reason)
-    return {"status": "FROZEN_MANUAL", "reason": reason}
+    return blockchain_client.freeze_session_on_chain(reason=reason)
 
 
 @router.post("/circuit-breaker/unfreeze")
 def unfreeze_session(reason: str = "SOC review cleared"):
-    circuit_breaker_telemetry["state"] = "ACTIVE"
-    circuit_breaker_telemetry["last_freeze_reason"] = None
-    blockchain_client.unfreeze_session_on_chain(reason=reason)
-    return {"status": "ACTIVE", "reason": reason}
+    return blockchain_client.unfreeze_session_on_chain(reason=reason)
 
 
 # --- 5. Stateful Invariant Report Endpoint ---
@@ -1266,3 +1202,14 @@ def get_invariant_report():
         ],
     }
 
+
+
+@router.get("/integration/status")
+def integration_status():
+    return {"chain_id": blockchain_client.deployments.get("chainId"),
+            "entry_point": blockchain_client.deployments.get("entryPoint"),
+            "policy": blockchain_client.get_on_chain_policy(),
+            "bundler_reachable": blockchain_client.is_bundler_reachable(),
+            "hardware_verification": "UNVERIFIED",
+            "acceptance": "BLOCKED_PENDING_LIVE_AND_HARDWARE_TESTS",
+            "legacy_phase2_endpoints": "SIMULATED"}

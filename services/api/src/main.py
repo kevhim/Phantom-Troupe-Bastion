@@ -12,6 +12,8 @@ from services.api.src.routes.api_v2 import router as api_v2_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    from services.api.src.routes.api_v2 import flight_rec
+    flight_rec.restore()
     yield
 
 app = FastAPI(
