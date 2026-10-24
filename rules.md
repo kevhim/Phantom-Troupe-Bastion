@@ -7,6 +7,6 @@
 5. Direct panic revocation only works if signer has gas/network and reaches an actual RPC; confirmed chain state != local panic.
 6. RC522 UID is weak/cloneable, PIR and finger counting only auxiliary signals, ESP32 not a certified HSM.
 7. Repo must not contain secrets or real money. Demo receipts are on real local chain using test tokens.
-8. Two active laptops: Laptop A (RTX 5060) application host; Laptop B (Intel Ultra 7 155H) trusted blockchain host & dedicated hardware signer; Laptop C standby.
-9. All 5 Phase 2 requirements are mandatory: 8 hijack attacks, anti-rollback circuit breaker freezing, 3-of-5 delayed guardian recovery, per-agent QuotaPaymaster gas sponsorship, and stateful Foundry authorization invariants.
+8. Two active laptops: Laptop A (RTX 5060) application host; Laptop B (Intel Ultra 7 155H) trusted blockchain host, dedicated hardware signer & Uno #1 Pin D8 buzzer; Laptop C standby (ESP8266 decommissioned).
+9. All 5 Phase 2 requirements are mandatory: 8 hijack attacks, anti-rollback circuit breaker freezing, 3-of-5 delayed guardian recovery, per-agent QuotaPaymaster gas sponsorship, and stateful Foundry authorization invariants. Update master + docs/tests when changing contracts, EIP712 types, hardware pins, roles, schema or cross-device protocol.
 10. New directories must have directory-local `rules.md`. Demonstration simulations must be clearly labeled, no fake cryptographic successes.

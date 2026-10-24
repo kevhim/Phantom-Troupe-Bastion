@@ -267,12 +267,12 @@ export default function App() {
     panic_button: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'GPIO32 Physical Panic Button' },
     gateway_b: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Laptop B Hardware Serial Gateway' },
     uno_q_edge: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Arduino UNO Q 4GB Edge Security Node' },
-    uno_sensors: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: 'Arduino Uno #1 (PIR, DHT11, 16x2 LCD)' },
+    uno_sensors: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: 'Arduino Uno #1 (Status LCD & Diagnostics)' },
+    uno_buzzer: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: '5V Active Buzzer (Uno #1 Pin D8)' },
     blockchain_node: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Local Anvil Blockchain & Bundler (:8545)' },
     // Laptop A — Application & Operator Domain
     esp32_telemetry: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'ESP32 #2 Operator Telemetry OLED #2' },
     uno_watchdog: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'Arduino Uno #2 Watchdog / Fault Tester' },
-    esp8266_buzzer: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'ESP8266 Remote Wi-Fi Buzzer Node' },
     camera: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'Webcam Face & Liveness Verification' },
   });
 
@@ -764,7 +764,7 @@ export default function App() {
                     </div>
                     <p className="text-[11px] text-slate-400">FastAPI Backend, AI Agent, Hijack Attack Simulator, Mirage Engine, SQLite DB</p>
                     <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800 space-y-0.5">
-                      <div>Devices: ESP32 #2, Uno #2, ESP8266, Cam</div>
+                      <div>Devices: ESP32 #2, Uno #2, Cam</div>
                       <div className="text-teal-400">Status: ONLINE (Port 8000 / 5173)</div>
                     </div>
                   </div>
@@ -777,7 +777,7 @@ export default function App() {
                     </div>
                     <p className="text-[11px] text-slate-400">Local Anvil Blockchain (:8545), QuotaPaymaster, Guardian Recovery, ESP32 Signer #1</p>
                     <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800 space-y-0.5">
-                      <div>Devices: ESP32 #1, UNO Q, Uno #1, RC522</div>
+                      <div>Devices: ESP32 #1, UNO Q, Uno #1 (Buzzer D8), RC522</div>
                       <div className="text-teal-400">Blockchain: Anvil 31337 Online</div>
                     </div>
                   </div>
@@ -1498,7 +1498,6 @@ export default function App() {
                     <div className="text-purple-400 font-bold">• Webcam (Optical Liveness / Face Count)</div>
                     <div>• ESP32 #2 + OLED #2 (Operator Telemetry SDA 21, SCL 22)</div>
                     <div>• Arduino Uno #2 (Watchdog / Fault Simulator)</div>
-                    <div>• ESP8266 NodeMCU (Buzzer D1/GPIO5, LED D4/GPIO2)</div>
                     <div className="text-amber-400/90 text-[10px] pt-1 border-t border-slate-800">⚠️ NO SIGNING KEYS STORED ON LAPTOP A</div>
                   </div>
                 </div>
@@ -1516,7 +1515,7 @@ export default function App() {
                     <div>• GPIO33 Approve Button (Sustained Press)</div>
                     <div>• GPIO32 Panic Button (Interrupt + Direct RPC Revoke)</div>
                     <div>• Arduino UNO Q 4GB (Linux Edge Gateway &amp; Telemetry)</div>
-                    <div>• Arduino Uno #1 (PIR D2, DHT11 D4, LCD A4/A5, Servo D6)</div>
+                    <div>• Arduino Uno #1 (5V Active Buzzer D8, Status LCD A4/A5, Opt. PIR/DHT11)</div>
                     <div className="text-teal-400 text-[10px] pt-1 border-t border-slate-800">🔒 Anvil Blockchain (31337) &amp; Bundler on Laptop B</div>
                   </div>
                 </div>

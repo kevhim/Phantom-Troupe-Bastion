@@ -1,6 +1,6 @@
 """
-BASTION X v2.2 — Laptop B Serial Hardware Gateway
-Manages serial ports for ESP32 #1 (Signer) and Uno #1 (Environmental Sensors).
+BASTION X v2.3 — Laptop B Serial Hardware Gateway
+Manages serial ports for ESP32 #1 (Signer) and Uno #1 (Status, Environmental & 5V Active Buzzer D8).
 Ensures each USB device has exactly ONE owning process.
 """
 
@@ -24,7 +24,7 @@ class LaptopBSerialGateway:
         """
         Parses structured JSON events received over serial.
         """
-        raw_line = raw_line.trim() if hasattr(raw_line, "trim") else raw_line.strip()
+        raw_line = raw_line.strip()
         if not raw_line:
             return None
         try:
@@ -32,6 +32,26 @@ class LaptopBSerialGateway:
         except json.JSONDecodeError:
             # Handle plain status strings
             return {"type": "raw_log", "message": raw_line, "timestamp": time.time()}
+
+    def send_uno_buzzer_command(self, active: bool = True) -> bool:
+        """
+        Transmits alarm actuation command to Arduino Uno #1 via serial.
+        """
+        if not self.uno_port:
+            logger.warning("Uno #1 port not configured, cannot send buzzer command directly")
+            return False
+
+        cmd = "ALARM:ON\n" if active else "ALARM:OFF\n"
+        try:
+            import serial
+            with serial.Serial(self.uno_port, 9600, timeout=1) as ser:
+                ser.write(cmd.encode("utf-8"))
+                time.sleep(0.05)
+                logger.info(f"Sent buzzer command {cmd.strip()} to {self.uno_port}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to send buzzer command to {self.uno_port}: {e}")
+            return False
 
     def get_gateway_status(self) -> Dict[str, Any]:
         return {
@@ -43,9 +63,10 @@ class LaptopBSerialGateway:
                     "connected": self.esp32_connected,
                     "baud": 115200,
                 },
-                "uno_sensors": {
+                "uno_sensors_buzzer": {
                     "port": self.uno_port or "AUTO_DETECT (COM_UNO)",
                     "connected": self.uno_connected,
+                    "buzzer_pin": 8,
                     "baud": 9600,
                 },
             },

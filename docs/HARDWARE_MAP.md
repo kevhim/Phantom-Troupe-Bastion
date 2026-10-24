@@ -1,17 +1,19 @@
-# Physical Architecture & Pin Assignment — V2.2
+# Physical Architecture & Pin Assignment — V2.3
 
 ## Authoritative Two-Machine Deployment Matrix
 | Node | Location | Electrical / Physical Connections | Software & Security Responsibilities |
 |---|---|---|---|
-| **Laptop A**<br>(RTX 5060, 32GB RAM) | Main Application & Operator Host | • Built-in / Owned Webcam<br>• ESP32 #2 via USB (OLED #2 on GPIO21/22)<br>• Arduino Uno #2 via USB (Watchdog)<br>• ESP8266 NodeMCU via USB (5V power for Active Buzzer on D1/GPIO5, LED on D4/GPIO2) | • React 18 Web Console (:5173)<br>• FastAPI Backend (:8000)<br>• AI Purchasing Agent<br>• OpenCV Vision Pipeline<br>• SQLite App DB & Mirage Sandbox<br>• **NO SIGNING KEYS STORED HERE** |
-| **Laptop B**<br>(Intel Core Ultra 7 155H, 32GB RAM) | Trusted Authorization & Security Station | • ESP32 #1 Dedicated Signer via USB<br>  - RC522 RFID (SPI: 18/19/23/5/27)<br>  - OLED #1 Trusted Review (I2C: 21/22)<br>  - Approval Button (GPIO33, sustained)<br>  - Panic Button (GPIO32, interrupt)<br>• Arduino UNO Q 4GB via USB-C<br>• Arduino Uno #1 via USB (PIR D2, DHT11 D4, LCD A4/A5, Servo D6) | • **Local Anvil Blockchain (:8545, Chain 31337)**<br>• Compatible ERC-4337 Bundler<br>• Supervisor Auth Service (:8010)<br>• Serial Hardware Gateway<br>• UNO Q Edge Coordinator<br>• Independent Audit Storage (`C:\bastion_audit_checkpoints`) |
+| **Laptop A**<br>(RTX 5060, 32GB RAM) | Main Application & Operator Host | • Built-in / Owned Webcam<br>• ESP32 #2 via USB (OLED #2 on GPIO21/22)<br>• Arduino Uno #2 via USB (Watchdog) | • React 18 Web Console (:5173)<br>• FastAPI Backend (:8000)<br>• AI Purchasing Agent<br>• OpenCV Vision Pipeline<br>• SQLite App DB & Mirage Sandbox<br>• **NO SIGNING KEYS STORED HERE** |
+| **Laptop B**<br>(Intel Core Ultra 7 155H, 32GB RAM) | Trusted Authorization & Security Station | • ESP32 #1 Dedicated Signer via USB<br>  - RC522 RFID (SPI: 18/19/23/5/27)<br>  - OLED #1 Trusted Review (I2C: 21/22)<br>  - Approval Button (GPIO33, sustained)<br>  - Panic Button (GPIO32, interrupt)<br>• Arduino UNO Q 4GB via USB-C<br>• Arduino Uno #1 via USB<br>  - **5V Active Buzzer (Pin D8)**<br>  - 16x2 I2C LCD (A4/A5)<br>  - Opt. PIR D2, DHT11 D4, Servo D6 | • **Local Anvil Blockchain (:8545, Chain 31337)**<br>• Compatible ERC-4337 Bundler<br>• Supervisor Auth Service (:8010)<br>• Serial Hardware Gateway<br>• UNO Q Edge Coordinator<br>• Independent Audit Storage (`C:\bastion_audit_checkpoints`) |
 | **Laptop C**<br>(RTX 4060) | Cold / Hot Standby Node | • Zero mandatory hardware connected | • Hot-standby Anvil RPC mirror<br>• Emergency compute or test runner |
 
-**Security Architecture Rule:**
+**Security Architecture Rules:**
 1. Dedicated physical transaction signing occurs **exclusively on ESP32 #1 attached to Laptop B**.
 2. Laptop A's ESP32 #2 and Arduino Uno #2 are strictly unprivileged and CANNOT authorize transactions.
 3. The local Anvil blockchain runs on Laptop B, ensuring emergency revocation broadcast directly succeeds even if Laptop A is powered down.
-4. ESP8266 is powered from Laptop A for wiring convenience, but receives authenticated alert triggers directly from Laptop B over Wi-Fi.
+4. **v2.3 Buzzer Architecture:** The non-functional ESP8266 has been decommissioned. The 5V active buzzer is connected directly to **Arduino Uno #1 Digital Pin D8** on Laptop B. The alarm now depends on the Intel supervisor/Uno #1 local serial path and no longer provides independent wireless notification.
+
+---
 
 ## ESP32 #1 Dedicated Signer (Laptop B)
 | Peripheral | Pin (ESP32-WROOM-32) | Logic Level | Notes |
@@ -27,18 +29,25 @@
 | **Panic Button** | **GPIO 32** | 3.3V | Configured with `INPUT_PULLUP`, instant ISR interrupt |
 | **Wi-Fi** | On-board Radio | 2.4 GHz | Direct RPC broadcast of `revokeSession` to Laptop B Anvil node |
 
-## Arduino Uno #1 Environmental & Status Node (Laptop B)
+---
+
+## Arduino Uno #1 Status & 5V Active Buzzer Node (Laptop B)
 | Peripheral | Pin | Logic Level | Purpose |
 |---|---|---|---|
-| **PIR Sensor** | **D2** | 5V Input | Optical motion observation (auxiliary telemetry) |
-| **DHT11 Sensor** | **D4** | 5V Digital | Ambient temperature and humidity context |
-| **16x2 I2C LCD** | **A4 (SDA), A5 (SCL)** | 5V I2C | Local desk status; NOT trusted payment confirmation |
+| **Active Buzzer** | **D8** | 5V Output | Physical audio alarm actuation (Active HIGH) driven by Laptop B Supervisor |
+| **16x2 I2C LCD** | **A4 (SDA), A5 (SCL)** | 5V I2C | Local desk status (0x27 or 0x3F); secondary status only |
+| **Optional PIR Sensor** | **D2** | 5V Input | Optical motion observation (auxiliary telemetry) |
+| **Optional DHT11 Sensor** | **D4** | 5V Digital | Ambient temperature and humidity context |
 | **Optional SG90 Servo** | **D6 (PWM)** | 5V PWM | Mechanical demonstration flag (if verified) |
+
+---
 
 ## Arduino UNO Q 4GB (Laptop B)
 - Connected to Laptop B via USB-C.
 - Runs Linux edge coordinator service (`services/edge-q/src/edge_coordinator.py`).
 - Collects and aggregates sensor telemetry, coordinates hardware gateway health, and forwards tamper alerts.
+
+---
 
 ## ESP32 #2 Operator Telemetry (Laptop A)
 - Connected to Laptop A via USB.
@@ -46,28 +55,17 @@
 - Displays operator status, daily budget progress, and security health.
 - **Holds NO signing keys and cannot sign transactions.**
 
+---
+
 ## Arduino Uno #2 Auxiliary Watchdog (Laptop A)
 - Connected to Laptop A via USB.
 - Runs watchdog heartbeat and simulated fault injector (`firmware/uno_watchdog/uno_watchdog.ino`).
 - **Strictly untrusted for financial approvals.**
 
-## ESP8266 NodeMCU & Active Buzzer (Laptop A)
-- Connected to Laptop A USB port for 5V power (VU rail).
-- Active buzzer signal on **D1 (GPIO 5)**; status LED on **D4 (GPIO 2)**.
-- Listens over Wi-Fi on port 80 for authenticated alarm messages (`X-Bastion-Alert-Secret`) sent from Laptop B.
-- Completely independent of Laptop A's FastAPI backend.
+---
 
-## Connectivity & Emergency Revocation Boundaries
-Because the local Anvil test blockchain is hosted on **Laptop B (:8545)**:
-- Laptop A submits application-level UserOperations to Laptop B over LAN.
-- When the physical panic button (GPIO32) is pressed on ESP32 #1, the device broadcasts `revokeSession` directly to `http://localhost:8545` on Laptop B.
-- Revocation succeeds even if Laptop A crashes, loses network, or is compromised!
-
-## Physical and electrical safety checklist
-- Label all board USB connections, COM device IDs, cables; no guessed COM5.
-- Verify actual ESP32 variant and GPIO availability/strapping constraints before final flashing.
-- Power 3.3V components from a suitable 3.3V supply. Never use Arduino digital pins as a power rail.
-- Avoid tying multiple laptop 5V USB power supplies together; isolated breadboard sections when necessary; ground only shared circuits explicitly.
-- Check current draw of OLED, RC522 and ESP32 against regulator limits. Don't drive a 5V buzzer or servo from ESP32 GPIO.
-- Configure GPIO pullups/debounce, have restart/watchdog behavior, and test what happens on power loss.
-- Take clear photos of **as-built** wiring and amend this document; example pin map is a proposed reference, not verified hardware measurement.
+## Decommissioned / Archived: ESP8266 NodeMCU
+- The ESP8266 remote Wi-Fi buzzer has been **permanently decommissioned** from active deployment in v2.3 due to physical module unreliability.
+- Active buzzer duties are consolidated on **Arduino Uno #1 (Pin D8)** on Laptop B.
+- Firmware is preserved in `firmware/esp8266_alert/` for historical reference only.
+- A missing ESP8266 **never** blocks application startup or security-state transitions.

@@ -27,12 +27,9 @@ All devices connect directly to Laptop A USB ports:
 | **ESP32 #2** | USB to Laptop A | Operator telemetry controller (NO signing keys) | 3.3V USB |
 | **OLED #2** | SDA: GPIO 21, SCL: GPIO 22 | Operator security & transaction display | 3.3V I2C (0x3C) |
 | **Arduino Uno #2** | USB to Laptop A | Watchdog, diagnostic heartbeat & fault generator | 5V Serial (9600 baud) |
-| **ESP8266 NodeMCU** | USB to Laptop A (5V Power) | Remote Wi-Fi buzzer & alarm receiver | 5V VU / 3.3V Logic |
-| **Active Buzzer** | D1 / GPIO 5 on ESP8266 | Audio security alarms & panic alerts | 5V Active |
-| **Status LED** | D4 / GPIO 2 on ESP8266 | Visual alarm pulse | Active-Low |
 
-> [!CAUTION]
-> The ESP8266 draws 5V USB power from Laptop A, but receives authenticated security alerts directly from Laptop B over Wi-Fi. It must NEVER route alert messages through Laptop A's application backend.
+> [!NOTE]
+> **v2.3 Architecture Notice:** The non-functional ESP8266 has been decommissioned. The 5V active buzzer is connected directly to **Arduino Uno #1 (Digital Pin D8)** on Laptop B. Laptop A has zero active alarm hardware dependencies.
 
 ---
 
@@ -90,12 +87,6 @@ arduino-cli upload -p COM_ESP32_A --fqbn esp32:esp32:esp32 firmware/esp32_teleme
 ```powershell
 arduino-cli compile --fqbn arduino:avr:uno firmware/uno_watchdog/uno_watchdog.ino
 arduino-cli upload -p COM_UNO2_A --fqbn arduino:avr:uno firmware/uno_watchdog/uno_watchdog.ino
-```
-
-### C. ESP8266 NodeMCU (Alert Buzzer)
-```powershell
-arduino-cli compile --fqbn esp8266:esp8266:generic firmware/esp8266_alert/esp8266_alert.ino
-arduino-cli upload -p COM_ESP8266_A --fqbn esp8266:esp8266:generic firmware/esp8266_alert/esp8266_alert.ino
 ```
 
 ---

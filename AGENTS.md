@@ -4,8 +4,8 @@ Read `PROJECT_MASTER.md`, `rules.md`, the complete ancestor path of nested `rule
 
 Never implement host-side ESP32 transaction signing. Real chain must enforce spending independently of agent/backend.
 Two active computers:
-- Laptop A (RTX 5060): Web console (:5173), FastAPI backend (:8000), AI purchasing agent, Adversarial Hijack Lab, OpenCV vision, SQLite DB, ESP32 #2 (OLED #2 telemetry), Uno #2 (watchdog), ESP8266 (Wi-Fi buzzer node).
-- Laptop B (Intel Ultra 7 155H): **Local Anvil Blockchain (:8545, Chain 31337)**, ERC-4337 bundler, QuotaPaymaster, GuardianRecovery, RiskCircuitBreaker, ESP32 #1 (dedicated signer + OLED #1 + RC522 + buttons), Arduino UNO Q 4GB (edge node), Arduino Uno #1 (PIR/DHT11/LCD), supervisor service (:8010).
+- Laptop A (RTX 5060): Web console (:5173), FastAPI backend (:8000), AI purchasing agent, Adversarial Hijack Lab, OpenCV vision, SQLite DB, ESP32 #2 (OLED #2 telemetry), Uno #2 (watchdog).
+- Laptop B (Intel Ultra 7 155H): **Local Anvil Blockchain (:8545, Chain 31337)**, ERC-4337 bundler, QuotaPaymaster, GuardianRecovery, RiskCircuitBreaker, ESP32 #1 (dedicated signer + OLED #1 + RC522 + buttons), Arduino UNO Q 4GB (edge node), Arduino Uno #1 (5V Active Buzzer Pin D8 + LCD status), supervisor service (:8010).
 - Laptop C (RTX 4060): Standby node.
 Never confuse RFID UID with cryptographic authentication.
 
@@ -17,5 +17,7 @@ BASTION X v2.3 implements:
 5. `contracts/test/WalletInvariant.t.sol`: Stateful Foundry invariant fuzzing with 16,384 calls across 256 runs verifying 10/10 security invariants.
 6. `tests/adversarial/`: 8 scripted hijack attacks proving agent financial losses never exceed daily cap.
 7. `apps/web/src/App.tsx`: 8-route React security console with interactive Hijack Lab, Guardian Recovery, QuotaPaymaster cards, and SOC.
-8. `docs/setup/`: Standalone per-laptop deployment runbooks (`LAPTOP_A_PHASE2.md`, `LAPTOP_B_PHASE2.md`, `PHASE2_INTEGRATION.md`).
-9. `tests/`: 43 automated tests passing 100% (34 Phase 1 + 9 Phase 2 adversarial).
+8. `firmware/`: Dedicated firmware for ESP32 #1, ESP32 #2, Uno #1 (5V Active Buzzer D8), Uno #2, and archived ESP8266.
+9. `docs/setup/`: Standalone per-laptop deployment runbooks (`LAPTOP_A_PHASE2.md`, `LAPTOP_B_PHASE2.md`, `PHASE2_INTEGRATION.md`).
+10. `tests/`: 43 automated tests passing 100% (34 Phase 1 + 9 Phase 2 adversarial).
+11. Architectural evolution: Decommissioned ESP8266; alarm now driven locally via Arduino Uno #1 Pin D8 on Laptop B.

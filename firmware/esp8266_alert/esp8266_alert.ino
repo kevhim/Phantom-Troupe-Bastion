@@ -1,17 +1,17 @@
 /**
- * BASTION X v2.2 — ESP8266 Wi-Fi Alarm & Buzzer Firmware
- * Physical Node Location: Powered by Laptop A (RTX 5060) via USB
- * Security Domain: Responds to authenticated LAN alerts from Laptop B (Intel Ultra 7)
- *
- * Hardware Wiring:
- * - Active Buzzer: Signal on D1 (GPIO 5) -> 5V active buzzer module
+ * [ARCHIVED IN v2.3] BASTION X — ESP8266 Wi-Fi Alarm & Buzzer Firmware
+ * -----------------------------------------------------------------------------
+ * ARCHIVE NOTICE (BASTION X v2.3):
+ * The ESP8266 has been decommissioned as a required hardware dependency.
+ * The 5V active buzzer is now connected directly to Arduino Uno #1 Pin D8 on
+ * Laptop B (Intel Core Ultra 7 155H), driven locally by the Supervisor Service.
+ * This file is preserved for reference and testing purposes only.
+ * -----------------------------------------------------------------------------
+ * Historical Topology:
+ * - Physical Node Location: Powered by Laptop A (RTX 5060) via USB
+ * - Security Domain: Responded to authenticated LAN alerts from Laptop B over Wi-Fi
+ * - Active Buzzer: Signal on D1 (GPIO 5)
  * - Status LED: On-board LED on D4 (GPIO 2)
- * - USB: Connects to Laptop A for 5V power and firmware flashing
- *
- * Security Invariants:
- * 1. Alert endpoint requires authenticated LAN token to prevent rogue triggers.
- * 2. Receives alerts directly from Laptop B security domain over Wi-Fi without routing through Laptop A's backend.
- * 3. Does not possess financial authority or signing capability.
  */
 
 #include <ESP8266WiFi.h>

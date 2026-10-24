@@ -55,8 +55,8 @@ AUXILIARY_COMPONENTS = {
     "camera",
     "esp32_telemetry",
     "uno_watchdog",
-    "esp8266_buzzer",
     "uno_sensors",
+    "uno_buzzer",
 }
 
 
@@ -71,13 +71,13 @@ class HardwareHealthManager:
             "panic_button": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "GPIO32 Physical Panic Button"},
             "gateway_b": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Laptop B Hardware Serial Gateway"},
             "uno_q_edge": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Arduino UNO Q 4GB Linux Edge Security Node"},
-            "uno_sensors": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Arduino Uno #1 (PIR, DHT11, 16x2 LCD)"},
+            "uno_sensors": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Arduino Uno #1 (Status LCD & Diagnostics)"},
+            "uno_buzzer": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "5V Active Buzzer on Arduino Uno #1 (Pin D8)"},
             "blockchain_node": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Local Anvil Blockchain & Bundler (Port 8545)"},
 
             # Laptop A — Application & Operator Domain
             "esp32_telemetry": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "ESP32 #2 Operator Telemetry OLED #2"},
             "uno_watchdog": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Arduino Uno #2 Watchdog / Fault Generator"},
-            "esp8266_buzzer": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "ESP8266 Remote Wi-Fi Buzzer Node"},
             "camera": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Webcam Optical Face & Liveness Verification"},
         }
 

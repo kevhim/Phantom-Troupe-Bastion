@@ -113,7 +113,7 @@ def get_overview():
                 "role": "Application Host, AI Agent, Computer Vision & Operator Telemetry",
                 "spec": "NVIDIA RTX 5060, 32GB RAM",
                 "status": "ONLINE",
-                "devices": ["esp32_telemetry", "uno_watchdog", "esp8266_buzzer", "camera"],
+                "devices": ["esp32_telemetry", "uno_watchdog", "camera"],
             },
             "laptop_b": {
                 "role": "Trusted Authorization, Hardware Signer, Local Blockchain & Supervisor",
@@ -121,7 +121,7 @@ def get_overview():
                 "status": "ONLINE",
                 "blockchain": "Anvil RPC :8545 (Chain ID 31337) + ERC-4337 Bundler",
                 "rpc_url": os.getenv("ANVIL_RPC_URL", "http://127.0.0.1:8545"),
-                "devices": ["esp32_signer", "rfid_reader", "approval_button", "panic_button", "gateway_b", "uno_q_edge", "uno_sensors", "blockchain_node"],
+                "devices": ["esp32_signer", "rfid_reader", "approval_button", "panic_button", "gateway_b", "uno_q_edge", "uno_sensors", "uno_buzzer", "blockchain_node"],
             },
             "laptop_c": {
                 "role": "Standby Backup Node",
