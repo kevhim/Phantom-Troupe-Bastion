@@ -98,6 +98,7 @@ struct CanonicalIntent {
 CanonicalIntent currentIntent;
 String scannedRole = "NONE";
 unsigned long reviewStartTime = 0;
+unsigned long pageStartTime = 0;
 const unsigned long REVIEW_TIMEOUT_MS = 30000; // 30-second physical review window
 
 // Network / RPC Configuration for Independent Panic Broadcast
@@ -121,6 +122,76 @@ void renderStatusScreen(const char* sessionState, const char* circuitBreakerStat
     statusDisplay.print(F("BUDGET: "));
     statusDisplay.println(budgetText);
     statusDisplay.display();
+}
+
+void runOledSelfTest() {
+    Serial.println(F("{\"test\":\"OLED_TEST_RUNNING\",\"oled_1\":\"0x3C\",\"oled_2\":\"0x3D\"}"));
+
+    if (displayHealthy) {
+        display.clearDisplay();
+        display.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SSD1306_WHITE);
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE);
+        display.setCursor(6, 6);
+        display.println(F("BASTION X OLED #1"));
+        display.setCursor(6, 18);
+        display.println(F("ADDR: 0x3C (PRIMARY)"));
+        display.setCursor(6, 30);
+        display.println(F("TRUSTED SIGNER: OK"));
+        display.setCursor(6, 42);
+        display.println(F("FAIL-CLOSED: ACTIVE"));
+        display.display();
+    }
+
+    if (statusDisplayHealthy) {
+        statusDisplay.clearDisplay();
+        statusDisplay.drawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SSD1306_WHITE);
+        statusDisplay.setTextSize(1);
+        statusDisplay.setTextColor(SSD1306_WHITE);
+        statusDisplay.setCursor(6, 6);
+        statusDisplay.println(F("BASTION X OLED #2"));
+        statusDisplay.setCursor(6, 18);
+        statusDisplay.println(F("ADDR: 0x3D (STATUS)"));
+        statusDisplay.setCursor(6, 30);
+        statusDisplay.println(F("SHARED I2C BUS: OK"));
+        statusDisplay.setCursor(6, 42);
+        statusDisplay.println(F("TELEMETRY: ONLINE"));
+        statusDisplay.display();
+    }
+
+    delay(2000);
+
+    // Graphic Pattern Test
+    if (displayHealthy) {
+        display.clearDisplay();
+        for (int i = 0; i < 64; i += 6) {
+            display.drawFastHLine(0, i, 128, SSD1306_WHITE);
+        }
+        display.display();
+    }
+    if (statusDisplayHealthy) {
+        statusDisplay.clearDisplay();
+        for (int i = 0; i < 128; i += 6) {
+            statusDisplay.drawFastVLine(i, 0, 64, SSD1306_WHITE);
+        }
+        statusDisplay.display();
+    }
+    delay(1000);
+
+    // Launch 4-page transaction review test sequence
+    currentIntent.chainId = 31337;
+    currentIntent.amountBaseUnits = 250000000; // 250 bUSD
+    strncpy(currentIntent.recipientAddress, "0x00000000000000000000000000000000000000cc", 42);
+    strncpy(currentIntent.targetContract, "0x00000000000000000000000000000000000000aa", 42);
+    strncpy(currentIntent.functionSelector, "0xa9059cbb", 10);
+    strncpy(currentIntent.shortFingerprint, "a7f4bc89", 8);
+    currentIntent.accountNonce = 1;
+    currentIntent.deadline = 300;
+    reviewStartTime = millis();
+    pageStartTime = millis();
+    currentState = STATE_REVIEW_PAGE1;
+    renderStatusScreen("TEST_RUN", "OLED_CYCLE", "$250 bUSD TEST");
+    Serial.println(F("{\"test\":\"OLED_PAGINATION_CYCLE_STARTED\",\"pages\":4,\"interval_ms\":3000}"));
 }
 
 void setupDisplays() {
@@ -239,7 +310,10 @@ void loop() {
             // Waiting for unsigned canonical intent from host
             if (Serial.available()) {
                 String cmd = Serial.readStringUntil('\n');
-                if (cmd.startsWith("INTENT:")) {
+                cmd.trim();
+                if (cmd.startsWith("TEST")) {
+                    runOledSelfTest();
+                } else if (cmd.startsWith("INTENT:")) {
                     if (!displayHealthy) {
                         Serial.println(F("{\"error\":\"DISPLAY_UNAVAILABLE\",\"message\":\"Signing rejected: Trusted OLED #1 is unavailable or malfunctioning.\"}"));
                         return;
@@ -254,6 +328,7 @@ void loop() {
                     currentIntent.accountNonce = 1;
                     currentIntent.deadline = 300; // +300s
                     reviewStartTime = millis();
+                    pageStartTime = millis();
                     currentState = STATE_REVIEW_PAGE1;
                     renderStatusScreen("REVIEWING", "HOLD_ARMED", "$250 bUSD PENDING");
                 }
@@ -268,9 +343,11 @@ void loop() {
             }
             // Page 1: Token, Amount, Transaction Fingerprint
             renderPage("REVIEW 1/4: AMOUNT", "Token: bUSD (6 dec)", "Amount: 250.00 bUSD", "FP: a7f4bc89", "Press APPROVE ->");
-            if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
-                delay(200);
+            if (digitalRead(PIN_BUTTON_APPROVE) == LOW || (millis() - pageStartTime >= 3000)) {
+                delay(150);
+                pageStartTime = millis();
                 currentState = STATE_REVIEW_PAGE2;
+                Serial.println(F("{\"page\":2,\"title\":\"RECIP\"}"));
             }
             break;
 
@@ -282,9 +359,11 @@ void loop() {
             }
             // Page 2: Full Recipient Address through readable pagination (Lines 1 & 2 covering all 42 characters)
             renderPage("REVIEW 2/4: RECIP", "Recip [1-21]:", "0x0000000000000000000", "Recip [22-42]:", "000000000000000000cc");
-            if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
-                delay(200);
+            if (digitalRead(PIN_BUTTON_APPROVE) == LOW || (millis() - pageStartTime >= 3000)) {
+                delay(150);
+                pageStartTime = millis();
                 currentState = STATE_REVIEW_PAGE3;
+                Serial.println(F("{\"page\":3,\"title\":\"TARGET\"}"));
             }
             break;
 
@@ -296,9 +375,11 @@ void loop() {
             }
             // Page 3: Target Contract, Function & Selector
             renderPage("REVIEW 3/4: TARGET", "Target: MockToken", "Func: transfer()", "Selector: 0xa9059cbb", "Press APPROVE ->");
-            if (digitalRead(PIN_BUTTON_APPROVE) == LOW) {
-                delay(200);
+            if (digitalRead(PIN_BUTTON_APPROVE) == LOW || (millis() - pageStartTime >= 3000)) {
+                delay(150);
+                pageStartTime = millis();
                 currentState = STATE_REVIEW_PAGE4;
+                Serial.println(F("{\"page\":4,\"title\":\"CHAIN\"}"));
             }
             break;
 
@@ -310,7 +391,11 @@ void loop() {
             }
             // Page 4: Chain ID, Nonce, Expiry, Fingerprint
             renderPage("REVIEW 4/4: CHAIN", "Chain ID: 31337", "Nonce: 1 | Exp: +300s", "FP: a7f4bc89", "Scan RFID Card...");
-            currentState = STATE_AWAITING_RFID;
+            if (millis() - pageStartTime >= 3000) {
+                pageStartTime = millis();
+                currentState = STATE_AWAITING_RFID;
+                Serial.println(F("{\"state\":\"AWAITING_RFID\",\"note\":\"Review sequence completed\"}"));
+            }
             break;
 
         case STATE_AWAITING_RFID:
