@@ -150,6 +150,13 @@ bool probeRFID() {
 }
 
 bool readCardUID(char outUid[21]) {
+    // Ensure transmitter antenna is active
+    byte tx = rfid.PCD_ReadRegister(MFRC522::TxControlReg);
+    if ((tx & 0x03) != 0x03) {
+        rfid.PCD_AntennaOn();
+        rfid.PCD_SetAntennaGain(MFRC522::RxGain_max);
+    }
+
     bool cardFound = false;
     if (rfid.PICC_IsNewCardPresent()) {
         cardFound = true;
@@ -170,7 +177,7 @@ bool readCardUID(char outUid[21]) {
         }
         rfid.PICC_HaltA();
         rfid.PCD_StopCrypto1();
-        return true;
+        return (strlen(outUid) > 0);
     }
     return false;
 }
@@ -1029,34 +1036,38 @@ void loop() {
     // 5. State Machine Processing
     switch (currentState) {
         case STATE_IDLE: {
-            // Check for physical NFC/RFID card presentation in idle mode
-            char uidBuf[21] = "";
-            if (readCardUID(uidBuf)) {
+            static unsigned long lastIdleScan = 0;
+            if (millis() - lastIdleScan >= 80) {
+                lastIdleScan = millis();
+                char uidBuf[21] = "";
+                if (readCardUID(uidBuf)) {
 
-                if (physicalCardJuniorUID.length() == 0) {
-                    physicalCardJuniorUID = String(uidBuf);
-                } else if (physicalCardJuniorUID != String(uidBuf) && physicalCardSeniorUID.length() == 0) {
-                    physicalCardSeniorUID = String(uidBuf);
+                    if (physicalCardJuniorUID.length() == 0) {
+                        physicalCardJuniorUID = String(uidBuf);
+                    } else if (physicalCardJuniorUID != String(uidBuf) && physicalCardSeniorUID.length() == 0) {
+                        physicalCardSeniorUID = String(uidBuf);
+                    }
+
+                    String roleStr = (physicalCardSeniorUID == String(uidBuf)) ? "SENIOR" : "JUNIOR";
+
+                    JsonDocument cardDoc;
+                    cardDoc["event"] = "RFID_CARD_DETECTED";
+                    cardDoc["uid"] = uidBuf;
+                    cardDoc["role"] = roleStr;
+                    serializeJson(cardDoc, Serial);
+                    Serial.println();
+
+                    if (displayHealthy) {
+                        char l1[32], l2[32], l3[32];
+                        snprintf(l1, sizeof(l1), "UID: %s", uidBuf);
+                        snprintf(l2, sizeof(l2), "Role: %s ($%s)", roleStr.c_str(), roleStr == "SENIOR" ? "10k" : "2k");
+                        snprintf(l3, sizeof(l3), "Status: AUTHORIZED");
+                        renderReviewPage("NFC CARD SCANNED", l1, l2, l3, "Ready for Payment");
+                        lastIdleCardScanTime = millis();
+                    }
                 }
-
-                String roleStr = (physicalCardSeniorUID == String(uidBuf)) ? "SENIOR" : "JUNIOR";
-
-                JsonDocument cardDoc;
-                cardDoc["event"] = "RFID_CARD_DETECTED";
-                cardDoc["uid"] = uidBuf;
-                cardDoc["role"] = roleStr;
-                serializeJson(cardDoc, Serial);
-                Serial.println();
-
-                if (displayHealthy) {
-                    char l1[32], l2[32], l3[32];
-                    snprintf(l1, sizeof(l1), "UID: %s", uidBuf);
-                    snprintf(l2, sizeof(l2), "Role: %s ($%s)", roleStr.c_str(), roleStr == "SENIOR" ? "10k" : "2k");
-                    snprintf(l3, sizeof(l3), "Status: AUTHORIZED");
-                    renderReviewPage("NFC CARD SCANNED", l1, l2, l3, "Ready for Payment");
-                    lastIdleCardScanTime = millis();
-                }
-            } else if (lastIdleCardScanTime > 0 && millis() - lastIdleCardScanTime > 3500) {
+            }
+            if (lastIdleCardScanTime > 0 && millis() - lastIdleCardScanTime > 3500) {
                 lastIdleCardScanTime = 0;
                 if (displayHealthy) {
                     renderReviewPage("TRUSTED SIGNER", "Status: ONLINE", "Firmware: v2.3", "Dual OLED Active", "NFC Card Ready");
@@ -1127,9 +1138,11 @@ void loop() {
             break;
 
         case STATE_AWAITING_RFID: {
-            // Physical RFID Presentation
-            char uidBuf[21] = "";
-            if (readCardUID(uidBuf)) {
+            static unsigned long lastReviewScan = 0;
+            if (millis() - lastReviewScan >= 60) {
+                lastReviewScan = millis();
+                char uidBuf[21] = "";
+                if (readCardUID(uidBuf)) {
 
                 JsonDocument scanEvt;
                 scanEvt["event"] = "RFID_SCANNED_DURING_REVIEW";
@@ -1175,6 +1188,7 @@ void loop() {
                     break;
                 }
             }
+        }
 
             if (millis() - reviewStartTime > REVIEW_TIMEOUT_MS) {
                 invalidateCurrentReview("REVIEW_TIMEOUT", "Physical review timed out (> 30s)");
