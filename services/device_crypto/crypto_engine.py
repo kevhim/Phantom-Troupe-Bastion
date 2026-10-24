@@ -98,10 +98,10 @@ def build_eip712_structured_data(intent: PaymentIntent) -> Dict[str, Any]:
 
 
 def compute_eip712_digest(intent: PaymentIntent) -> bytes:
-    """Calculate the 32-byte EIP-712 signing digest."""
+    """Calculate the 32-byte EIP-712 signing digest: keccak256(b'\\x19\\x01' + DOMAIN_SEPARATOR + structHash)."""
     structured_data = build_eip712_structured_data(intent)
     signable_message = encode_typed_data(full_message=structured_data)
-    return signable_message.body
+    return Web3.keccak(b"\x19" + signable_message.version + signable_message.header + signable_message.body)
 
 
 def sign_payment_intent(intent: PaymentIntent, private_key_hex: str) -> str:

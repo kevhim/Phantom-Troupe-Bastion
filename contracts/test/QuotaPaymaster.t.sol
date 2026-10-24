@@ -71,7 +71,7 @@ contract QuotaPaymasterTest is Test {
             assertEq(val, 0);
 
             vm.prank(address(entryPoint));
-            paymaster.postOp(PostOpMode.opSucceeded, ctx, 0.01 ether);
+            paymaster.postOp(IPaymaster.PostOpMode.opSucceeded, ctx, 0.01 ether);
         }
 
         // Agent A's quota is now fully exhausted (0.1 ETH spent)

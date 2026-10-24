@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Revocation and Circuit Breaker Lifecycle Types",
+  "states": {
+    "circuitBreaker": {
+      "0": "ACTIVE",
+      "1": "FROZEN_AUTOMATIC",
+      "2": "FROZEN_MANUAL",
+      "3": "RECOVERY_PENDING",
+      "4": "RECOVERED"
+    },
+    "sessionStatus": {
+      "ACTIVE": "Agent session key is valid and authorized for payments within limits",
+      "PAUSED": "Temporarily disabled by owner via pauseSession(sessionId, true)",
+      "REVOKED": "Permanently invalidated on-chain via revokeSession(sessionId, reason)",
+      "FROZEN": "Halted by RiskCircuitBreaker due to velocity or spending burst anomaly",
+      "EXPIRED": "Block timestamp exceeds sessionExpiry"
+    }
+  },
+  "rolesAuthorizedToRevoke": [
+    "owner",
+    "revokerRole"
+  ],
+  "revocationMethods": {
+    "onChainRevoke": {
+      "contract": "BastionAccount",
+      "method": "revokeSession(bytes32 sessionId, string reason)",
+      "callers": ["owner", "revokerRole"]
+    },
+    "onChainPause": {
+      "contract": "BastionAccount",
+      "method": "pauseSession(bytes32 sessionId, bool isPaused)",
+      "callers": ["owner"]
+    },
+    "directEmergencyRpc": {
+      "endpoint": "http://127.0.0.1:8545",
+      "description": "ESP32 direct Wi-Fi emergency JSON-RPC call signed with revokerRole private key"
+    }
+  }
+}
