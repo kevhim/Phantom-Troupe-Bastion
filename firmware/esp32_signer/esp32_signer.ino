@@ -861,6 +861,27 @@ void handleSerialCommand(const String& cmd) {
         serializeJson(res, Serial);
         Serial.println();
         return;
+    } else if (strcmp(action, "DISPLAY_TX") == 0) {
+        const char* title = doc["title"] | "TRANSACTION";
+        const char* l1 = doc["line1"] | "";
+        const char* l2 = doc["line2"] | "";
+        const char* l3 = doc["line3"] | "";
+        const char* l4 = doc["line4"] | "";
+        if (displayHealthy) {
+            renderReviewPage(title, l1, l2, l3, l4);
+        }
+        if (statusDisplayHealthy) {
+            const char* st = doc["state"] | "TX_UPDATE";
+            const char* rf = doc["rfid"] | "AUTH_OK";
+            const char* bg = doc["budget"] | "NORMAL";
+            renderStatusScreen(st, rf, bg);
+        }
+        JsonDocument res;
+        res["status"] = "DISPLAY_UPDATED";
+        res["title"] = title;
+        serializeJson(res, Serial);
+        Serial.println();
+        return;
     } else if (strcmp(action, "DIAGNOSTIC_SIGN") == 0) {
         // Authorized bench diagnostic: exercises real secp256k1 engine on physical chip
         const char* diagKey = doc["key"] | "";

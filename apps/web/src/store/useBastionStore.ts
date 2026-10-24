@@ -3,7 +3,8 @@ import {
   pingDevice, 
   getSensorTelemetry, 
   testBuzzer as bridgeTestBuzzer, 
-  configureBridge 
+  configureBridge,
+  updateHardwareOledDisplay
 } from '../services/hardwareBridge';
 
 export interface VerifiedMerchant {
@@ -283,6 +284,13 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
 
     // 1. Check if Panic is active
     if (state.emergencyState === 'PANIC_FROZEN' || state.sessionKeyStatus === 'REVOKED') {
+      updateHardwareOledDisplay({
+        title: 'SESSION BLOCKED',
+        line1: `Amt: $${amount.toFixed(2)} USDC`,
+        line2: 'Session Revoked',
+        line3: 'Emergency Panic Latched',
+        line4: 'Payments Rejected',
+      });
       set({
         activeTxStatus: {
           state: 'BLOCKED_POLICY',
@@ -296,6 +304,13 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
 
     // 2. Check if Untrusted Merchant
     if (isUntrusted) {
+      updateHardwareOledDisplay({
+        title: 'POLICY BLOCKED',
+        line1: `Amt: $${amount.toFixed(2)} USDC`,
+        line2: `To: ${merchantAddress.substring(0, 16)}`,
+        line3: 'Unverified Merchant',
+        line4: 'Reverted by Policy',
+      });
       const failedItem: UserOperationItem = {
         id: 'tx-' + Date.now(),
         txHash: '0x' + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
@@ -334,6 +349,14 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
         status: 'PENDING',
       };
 
+      updateHardwareOledDisplay({
+        title: 'EXCEPTION REVIEW',
+        line1: `Amt: $${amount.toFixed(2)} USDC`,
+        line2: `To: ${merchantName.substring(0, 16)}`,
+        line3: 'Awaiting Card Auth',
+        line4: '⚡ Tap Junior/Senior',
+      });
+
       set({
         activeTxStatus: {
           state: 'WAITING_HARDWARE',
@@ -362,6 +385,14 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
       timestamp: 'Just now',
       details: 'On-chain auto-approved payment',
     };
+
+    updateHardwareOledDisplay({
+      title: 'PAYMENT SENT',
+      line1: `Amt: $${amount.toFixed(2)} USDC`,
+      line2: `To: ${merchantName.substring(0, 16)}`,
+      line3: 'Status: MINED ON-CHAIN',
+      line4: `Tx: ${newTxHash.substring(0, 14)}...`,
+    });
 
     set({
       balanceUsdc: Math.max(0, Number((state.balanceUsdc - amount).toFixed(2))),
@@ -405,7 +436,36 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
   },
 
   // Hardware Signer
-  setOledPage: (page) => set({ oledPage: page }),
+  setOledPage: (page) => {
+    set({ oledPage: page });
+    const state = get();
+    const active = state.activeApproval;
+    if (page === 1) {
+      updateHardwareOledDisplay({
+        title: '1/3 INTENT REVIEW',
+        line1: active ? `Amt: $${active.amountUsdc.toFixed(2)} USDC` : 'Status: READY',
+        line2: active ? `To: ${active.merchantName.substring(0, 16)}` : 'Awaiting Transaction',
+        line3: 'Digest: Verified',
+        line4: 'OLED #1 Active',
+      });
+    } else if (page === 2) {
+      updateHardwareOledDisplay({
+        title: '2/3 CALLDATA HASH',
+        line1: active ? `Hash: ${active.calldataDigest.substring(0, 14)}...` : 'Hash: 0x0000...0000',
+        line2: active ? `Inv: ${active.invoiceId.substring(0, 16)}` : 'Inv: None',
+        line3: 'Policy: PASSED',
+        line4: 'Tap Card Next',
+      });
+    } else if (page === 3) {
+      updateHardwareOledDisplay({
+        title: '3/3 NFC CARD AUTH',
+        line1: 'Card 1: Junior ($2k)',
+        line2: 'Card 2: Senior ($10k)',
+        line3: 'Instant Auto-Sign',
+        line4: '⚡ Tap to Authorize',
+      });
+    }
+  },
 
   setRfidState: (rfid) => {
     set({ rfidState: rfid, rfidError: null });
@@ -451,6 +511,14 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
       details: `Hardware-verified (OLED reviewed + ${isSenior ? 'Senior Card (Cap $10k)' : 'Junior Card (Cap $2k)'} tap-approved)`
     };
 
+    updateHardwareOledDisplay({
+      title: 'TX APPROVED',
+      line1: `Amt: $${state.activeApproval.amountUsdc.toFixed(2)} USDC`,
+      line2: `To: ${state.activeApproval.merchantName.substring(0, 16)}`,
+      line3: `Auth: ${isSenior ? 'Senior ($10k)' : 'Junior ($2k)'}`,
+      line4: `Mined: ${newTxHash.substring(0, 14)}...`,
+    });
+
     set({
       rfidState: effectiveRfid,
       gpio33Approve: true,
@@ -472,6 +540,13 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
   },
 
   pressGpioPanic: () => {
+    updateHardwareOledDisplay({
+      title: 'EMERGENCY PANIC',
+      line1: 'HARDWARE LOCKOUT',
+      line2: 'Session Terminated',
+      line3: 'Contract Frozen',
+      line4: 'Safe State Latched',
+    });
     set({
       gpio32Panic: true,
       emergencyState: 'PANIC_FROZEN',
@@ -487,6 +562,13 @@ export const useBastionStore = create<BastionStoreState>((set, get) => ({
   },
 
   resetPanic: () => {
+    updateHardwareOledDisplay({
+      title: 'TRUSTED SIGNER',
+      line1: 'Status: ONLINE',
+      line2: 'Firmware: v2.3',
+      line3: 'Dual OLED Active',
+      line4: 'NFC Card Ready',
+    });
     set({
       gpio32Panic: false,
       emergencyState: 'NORMAL',

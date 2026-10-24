@@ -112,6 +112,40 @@ export async function getSensorTelemetry(): Promise<{
   }
 }
 
+export interface OledDisplayPayload {
+  title: string;
+  line1?: string;
+  line2?: string;
+  line3?: string;
+  line4?: string;
+  state?: string;
+  rfid?: string;
+  budget?: string;
+}
+
+/** Push transaction or status text directly to physical ESP32 OLED screen */
+export async function updateHardwareOledDisplay(payload: OledDisplayPayload): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(`/api/v2/hardware/display-tx`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch {
+    try {
+      const res = await fetchWithTimeout(`${currentConfig.apiBaseUrl}/api/v2/hardware/display-tx`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 /** Trigger buzzer test on hardware */
 export async function testBuzzer(): Promise<boolean> {
   if (isSimulated()) {

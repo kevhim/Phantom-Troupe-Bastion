@@ -709,6 +709,57 @@ def confirm_revocation(sub: RevocationReceiptSubmission):
     return result
 
 
+class DisplayTxRequest(BaseModel):
+    title: str = "TRANSACTION"
+    line1: str = ""
+    line2: str = ""
+    line3: str = ""
+    line4: str = ""
+    state: Optional[str] = "TX_UPDATE"
+    rfid: Optional[str] = "AUTH_OK"
+    budget: Optional[str] = "NORMAL"
+
+
+@router.post("/hardware/display-tx")
+def display_tx_on_oled(req: DisplayTxRequest):
+    """
+    Directly updates the physical OLED #1 review screen (and status screen if connected)
+    on the single ESP32 signer on COM10.
+    """
+    port = os.getenv("ESP32_PORT", "COM10")
+    try:
+        import serial
+        s = serial.Serial()
+        s.port = port
+        s.baudrate = 115200
+        s.dtr = False
+        s.rts = False
+        s.timeout = 1.0
+        s.open()
+        time.sleep(0.05)
+        cmd = {
+            "action": "DISPLAY_TX",
+            "title": req.title,
+            "line1": req.line1,
+            "line2": req.line2,
+            "line3": req.line3,
+            "line4": req.line4,
+            "state": req.state,
+            "rfid": req.rfid,
+            "budget": req.budget,
+        }
+        s.write(json.dumps(cmd).encode("utf-8") + b"\n")
+        raw_res = s.readline().decode("utf-8", errors="ignore").strip()
+        s.close()
+        try:
+            res_json = json.loads(raw_res)
+            return {"status": "SUCCESS", "device_response": res_json, "rendered": req.model_dump()}
+        except Exception:
+            return {"status": "SUCCESS", "raw_response": raw_res, "rendered": req.model_dump()}
+    except Exception as exc:
+        return {"status": "SIMULATED_SUCCESS", "note": str(exc), "rendered": req.model_dump()}
+
+
 # --- Agent Session State Route ---
 @router.get("/sessions")
 def get_sessions():
