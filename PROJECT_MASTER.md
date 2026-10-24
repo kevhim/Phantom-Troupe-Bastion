@@ -37,15 +37,15 @@ S9. Software integrity, hardware compromise, phishing of independent signer, sto
 S10. Logs are tamper-evident only with protected independent checkpoints. No raw wallet keys, full prompts, images or customer data on a public chain.
 S11. No two laptop processes own the same serial device; avoid connecting unrelated 5V USB power rails. RC522 and ESP32 GPIO are 3.3V; never connect Arduino 5V TX to ESP32 input without a proper compatible interface.
 
-## MACHINE ALLOCATION — FINAL V2.2
+## MACHINE ALLOCATION — FINAL V2.3
 ### LAPTOP A (RTX 5060, 32GB RAM) — APPLICATION & OPERATOR DOMAIN
 - Role: Web UI (`apps/web` :5173), FastAPI Backend (`services/api` :8000), AI Purchasing Agent, Computer Vision (Webcam), SQLite App DB, Mirage Engine, SOC Dashboard.
 - Hardware Attached:
   - Built-in / Owned Webcam (Optical Face Counting & Challenge-Response Liveness)
   - ESP32 #2 via USB + OLED #2 (I2C: SDA 21, SCL 22) — Operator Telemetry only (NO SIGNING KEYS)
   - Arduino Uno #2 via USB — Auxiliary Watchdog, Heartbeat & Fault Generator (strictly untrusted for transactions)
-  - ESP8266 NodeMCU via USB — 5V Power for Active Buzzer on D1/GPIO5 and LED on D4/GPIO2 (receives authenticated Wi-Fi alerts from Laptop B)
 - **Security Rule: NEVER store owner root signing keys or privileged ESP32 keys on Laptop A.**
+- **v2.3 Note: ESP8266 has been decommissioned from Laptop A.**
 
 ### LAPTOP B (Intel Ultra 7 155H, 32GB RAM) — TRUSTED AUTHORIZATION & BLOCKCHAIN HOST
 - Role: Physical Security Gateway, Supervisor Workstation, Local Blockchain & Bundler Host, Independent Audit Storage.
@@ -56,12 +56,16 @@ S11. No two laptop processes own the same serial device; avoid connecting unrela
     - Physical Approval Button (GPIO 33, sustained press >= 1.5s)
     - Physical Panic Button (GPIO 32, instant ISR interrupt + direct Wi-Fi revocation)
   - Arduino UNO Q 4GB via USB-C (Linux edge coordinator service & gateway telemetry)
-  - Arduino Uno #1 via USB (PIR D2, DHT11 D4, 16x2 LCD A4/A5, optional SG90 servo D6)
+  - Arduino Uno #1 via USB:
+    - **5V Active Buzzer on Pin D8** (Signal / +), GND to common rail
+    - 16x2 I2C LCD (A4 SDA, A5 SCL)
+    - Optional sensors: PIR (D2), DHT11 (D4), SG90 Servo (D6)
 - Software Services:
   - **Local Anvil Blockchain Node (:8545, Chain ID 31337)**
   - Compatible ERC-4337 Bundler Service
   - Supervisor Service (:8010) & Serial Hardware Gateway
   - Independent Audit Storage (`C:\bastion_audit_checkpoints` or `/opt/bastion/audit_checkpoints`)
+- **v2.3 Architectural Decision:** The 5V active buzzer is driven directly by Arduino Uno #1 on Pin D8 via the Laptop B Supervisor Service. The alarm now depends on the Intel supervisor/Uno #1 local serial path and no longer provides independent wireless notification.
 
 ### LAPTOP C (RTX 4060, 16/32GB RAM) — HOT-STANDBY BACKUP NODE
 - Role: Cold/hot standby failover node.
@@ -75,22 +79,22 @@ S11. No two laptop processes own the same serial device; avoid connecting unrela
 - `services/gateway`: B-only UART ownership for classic Uno; records observed telemetry; never creates `HARDWARE_APPROVED` events on behalf of ESP32.
 - `services/edge-q`: UNO Q Linux telemetry/status and health; no ultimate financial authority.
 - `firmware/esp32_signer`: directly connected signer input/display, signed typed message generation, revocation RPC, provisioned keys, audit receipts.
-- `firmware/uno_operator`: PIR/DHT/LCD status and optional servo only.
+- `firmware/uno_operator`: 5V Active Buzzer (Pin D8), status LCD, and optional PIR/DHT sensors.
 - `firmware/uno_supervisor`: optional independent watchdog; no essential authorization pin ownership.
-- `firmware/esp8266_alert`: independent remote alarm; no money keys.
+- `firmware/esp8266_alert`: [ARCHIVED in v2.3] Replaced by Uno #1 Pin D8 buzzer on Laptop B.
 - `contracts`: ERC-4337 account; policy, exception tiering, distinct roles, on-chain revocation, mock ERC-20/vendor, Foundry tests.
 - `data`: SQLite on A; signing device maintains minimal volatile pending intent and monotonically increasing device event counter; authoritative spending state is on-chain.
 
 ## REQUIRED END-TO-END FLOWS
 **Normal:** agent intent -> backend advisory -> restricted session-key UserOp -> 4337 bundler/EntryPoint -> contract checks -> test-token transfer -> real receipt.
 **Exception:** agent requests exact operation -> backend queues -> B supervisor asks ESP32 to fetch/receive canonical unsigned intent -> ESP32 independently validates structure, shows exact data on OLED, checks directly wired RFID and physical approve button -> ESP32 signs limited-tier EIP-712 `PaymentIntent` -> **every out-of-policy request also requires independent owner-signed authorization in the default W3-02 build** (higher tier adds stricter bounds/review) -> EntryPoint/account verifies signatures and exact operation nonce/expiry -> receipt; do NOT claim RFID UID alone proves owner.
-**Panic:** directly wired panic switch -> ESP32 local refusal to sign + send signed revocation tx to configured peer-accessible RPC; ESP8266 notified; app may start synthetic sandbox but **no real funds moved** -> dashboard distinguishes `PANIC_LOCAL`, `REVOKE_SUBMITTED`, `REVOKE_CONFIRMED` or `REVOKE_UNAVAILABLE`.
+**Panic:** directly wired panic switch -> ESP32 local refusal to sign + send signed revocation tx to configured peer-accessible RPC; Uno #1 Pin D8 buzzer sounded via Supervisor; app may start synthetic sandbox but **no real funds moved** -> dashboard distinguishes `PANIC_LOCAL`, `REVOKE_SUBMITTED`, `REVOKE_CONFIRMED` or `REVOKE_UNAVAILABLE`.
 **Mirage:** visible only in optional demo/adversarial lab; synthetic API namespace and independent fixture store, no real wallet keys or actual chain signing; supervisor dashboard displays mode truthfully.
 
 ## BUILD ORDER (DO NOT CHANGE)
 P0: local real 4337 UserOp + 6 tested permissions + session-key revocation + owner exception.  
 P1: ESP32 OLED review and physical direct buttons/RFID, limited on-device signature, independent signature verification on chain.  
-P2: ESP32 direct revocation broadcast, UART sensors, UNO Q & ESP8266 telemetry, polished dashboard.  
+P2: ESP32 direct revocation broadcast, UART sensors, UNO Q telemetry & Uno #1 buzzer, polished dashboard.  
 P3: Mirage, vision gating, separate-Laptop-C RPC, on-chain log anchors, servo.  
 **No feature moves earlier without a successful documented security test and team approval.**
 
