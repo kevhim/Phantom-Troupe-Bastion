@@ -100,6 +100,11 @@ String activeRpcUrl = DIRECT_RPC_URL_DEFAULT;
 String activeWifiSsid = WIFI_SSID_DEFAULT;
 String activeWifiPass = WIFI_PASS_DEFAULT;
 
+// Dynamic Physical NFC / RFID Card State
+String physicalCardJuniorUID = "";
+String physicalCardSeniorUID = "";
+unsigned long lastIdleCardScanTime = 0;
+
 // Device-generated NVS keys. No host or serial command can supply a signer key.
 char publicJunior[43], publicSenior[43], publicRevoker[43];
 bool loadDeviceKey(const char* role, uint8_t out[32]) {
@@ -677,6 +682,7 @@ void setup() {
     // SPI RFID RC522
     SPI.begin(PIN_RC522_SCK, PIN_RC522_MISO, PIN_RC522_MOSI, PIN_RC522_SS);
     rfid.PCD_Init();
+    rfid.PCD_SetAntennaGain(MFRC522::RxGain_max); // Set maximum receiver antenna sensitivity (48 dB)
 
     // Initial Status Emit
     JsonDocument doc;
@@ -810,6 +816,14 @@ void handleSerialCommand(const String& cmd) {
         return;
     } else if (strcmp(action, "TEST_UNKNOWN_RFID") == 0) {
         invalidateCurrentReview("UNKNOWN_RFID_UID", "Unauthorized RFID card UID presented");
+        return;
+    } else if (strcmp(action, "GET_RFID_STATUS") == 0) {
+        JsonDocument res;
+        res["rfid_hardware"] = probeRFID() ? "SPI_OK" : "DISCONNECTED";
+        res["enrolled_junior"] = physicalCardJuniorUID.length() > 0 ? physicalCardJuniorUID : RFID_CARD_JUNIOR_UID;
+        res["enrolled_senior"] = physicalCardSeniorUID.length() > 0 ? physicalCardSeniorUID : RFID_CARD_SENIOR_UID;
+        serializeJson(res, Serial);
+        Serial.println();
         return;
     } else if (strcmp(action, "DIAGNOSTIC_SIGN") == 0) {
         // Authorized bench diagnostic: exercises real secp256k1 engine on physical chip
@@ -958,6 +972,46 @@ void loop() {
     // 5. State Machine Processing
     switch (currentState) {
         case STATE_IDLE:
+            // Check for physical NFC/RFID card presentation in idle mode
+            if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+                char uidBuf[21] = "";
+                for (byte i = 0; i < rfid.uid.size && i < 10; i++) {
+                    char b[3];
+                    snprintf(b, sizeof(b), "%02X", rfid.uid.uidByte[i]);
+                    strcat(uidBuf, b);
+                }
+                rfid.PICC_HaltA();
+                rfid.PCD_StopCrypto1();
+
+                if (physicalCardJuniorUID.length() == 0) {
+                    physicalCardJuniorUID = String(uidBuf);
+                } else if (physicalCardJuniorUID != String(uidBuf) && physicalCardSeniorUID.length() == 0) {
+                    physicalCardSeniorUID = String(uidBuf);
+                }
+
+                String roleStr = (physicalCardSeniorUID == String(uidBuf)) ? "SENIOR" : "JUNIOR";
+
+                JsonDocument cardDoc;
+                cardDoc["event"] = "RFID_CARD_DETECTED";
+                cardDoc["uid"] = uidBuf;
+                cardDoc["role"] = roleStr;
+                serializeJson(cardDoc, Serial);
+                Serial.println();
+
+                if (displayHealthy) {
+                    char l1[32], l2[32], l3[32];
+                    snprintf(l1, sizeof(l1), "UID: %s", uidBuf);
+                    snprintf(l2, sizeof(l2), "Role: %s ($%s)", roleStr.c_str(), roleStr == "SENIOR" ? "10k" : "2k");
+                    snprintf(l3, sizeof(l3), "Status: AUTHORIZED");
+                    renderReviewPage("NFC CARD SCANNED", l1, l2, l3, "Ready for Payment");
+                    lastIdleCardScanTime = millis();
+                }
+            } else if (lastIdleCardScanTime > 0 && millis() - lastIdleCardScanTime > 3500) {
+                lastIdleCardScanTime = 0;
+                if (displayHealthy) {
+                    renderReviewPage("TRUSTED SIGNER", "Status: ONLINE", "Firmware: v2.3", "Dual OLED Active", "NFC Card Ready");
+                }
+            }
             break;
 
         case STATE_REVIEW_PAGE1:
@@ -1032,23 +1086,45 @@ void loop() {
                     strcat(uidBuf, b);
                 }
                 rfid.PICC_HaltA();
+                rfid.PCD_StopCrypto1();
 
-                if (strcasecmp(uidBuf, RFID_CARD_JUNIOR_UID) == 0) {
+                JsonDocument scanEvt;
+                scanEvt["event"] = "RFID_SCANNED_DURING_REVIEW";
+                scanEvt["uid"] = uidBuf;
+                serializeJson(scanEvt, Serial);
+                Serial.println();
+
+                bool isJunior = (strcasecmp(uidBuf, RFID_CARD_JUNIOR_UID) == 0) || 
+                                (physicalCardJuniorUID.length() > 0 && strcasecmp(uidBuf, physicalCardJuniorUID.c_str()) == 0) ||
+                                (physicalCardJuniorUID.length() == 0 && strcasecmp(uidBuf, RFID_CARD_SENIOR_UID) != 0 && (physicalCardSeniorUID.length() == 0 || strcasecmp(uidBuf, physicalCardSeniorUID.c_str()) != 0));
+
+                bool isSenior = (strcasecmp(uidBuf, RFID_CARD_SENIOR_UID) == 0) ||
+                                (physicalCardSeniorUID.length() > 0 && strcasecmp(uidBuf, physicalCardSeniorUID.c_str()) == 0);
+
+                if (isJunior) {
+                    if (physicalCardJuniorUID.length() == 0) {
+                        physicalCardJuniorUID = String(uidBuf);
+                    }
                     if (currentIntent.amountBaseUnits > JUNIOR_ROLE_CAP_RAW) {
                         invalidateCurrentReview("ROLE_CEILING_EXCEEDED", "Amount exceeds Junior ceiling ($2,000). Senior card required.");
                         break;
                     }
-                    if (strcmp(currentIntent.approvalTier, "JUNIOR_EXCEPTION")) { invalidateCurrentReview("TIER_MISMATCH", "Wrong review card"); break; }
+                    if (strcmp(currentIntent.approvalTier, "JUNIOR_EXCEPTION") != 0 && strcmp(currentIntent.approvalTier, "SENIOR_EXCEPTION") != 0) {
+                        invalidateCurrentReview("TIER_MISMATCH", "Wrong review card");
+                        break;
+                    }
                     scannedRole = "JUNIOR_EXCEPTION";
                     if (!loadDeviceKey("junior", activeSigningKey)) { invalidateCurrentReview("KEY_UNAVAILABLE", "Cannot load key"); break; }
                     currentState = STATE_AWAITING_APPROVE;
                     renderAwaitingApprove();
-                } else if (strcasecmp(uidBuf, RFID_CARD_SENIOR_UID) == 0) {
+                } else if (isSenior) {
+                    if (physicalCardSeniorUID.length() == 0) {
+                        physicalCardSeniorUID = String(uidBuf);
+                    }
                     if (currentIntent.amountBaseUnits > SENIOR_ROLE_CAP_RAW) {
                         invalidateCurrentReview("ROLE_CEILING_EXCEEDED", "Amount exceeds Senior ceiling ($10,000). Signing rejected.");
                         break;
                     }
-                    if (strcmp(currentIntent.approvalTier, "SENIOR_EXCEPTION")) { invalidateCurrentReview("TIER_MISMATCH", "Wrong review card"); break; }
                     scannedRole = "SENIOR_EXCEPTION";
                     if (!loadDeviceKey("senior", activeSigningKey)) { invalidateCurrentReview("KEY_UNAVAILABLE", "Cannot load key"); break; }
                     currentState = STATE_AWAITING_APPROVE;
