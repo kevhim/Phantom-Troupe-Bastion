@@ -1,4 +1,4 @@
-export type EnvironmentMode = 'LOCAL_TESTNET' | 'SIMULATED_MIRAGE' | 'OFFLINE_DISCONNECTED';
+export type EnvironmentMode = 'LIVE_LAN' | 'MIRAGE' | 'SIMULATED';
 
 export type UserRole = 'OPERATOR' | 'SUPERVISOR';
 
@@ -13,6 +13,26 @@ export type EmergencyState =
   | 'REVOKE_UNAVAILABLE';
 
 export type RfidCardStatus = 'NO_CARD' | 'CARD_1_JUNIOR' | 'CARD_2_SENIOR';
+
+export type IncidentState =
+  | 'NORMAL'
+  | 'PANIC_LOCAL'
+  | 'REVOKE_SIGNED'
+  | 'REVOKE_SUBMITTED'
+  | 'REVOKE_CONFIRMED';
+
+export interface VerifiedMerchant {
+  id: string;
+  name: string;
+  ensName?: string;
+  address: string;
+  kybVerified: boolean;
+  walletSigVerified: boolean;
+  merkleRootAttested: boolean;
+  merkleNote?: string;
+  lastVerified: string;
+  trusted: boolean;
+}
 
 export interface PaymentIntent {
   id: string;
@@ -31,6 +51,7 @@ export interface PaymentIntent {
   status: IntentStatus;
   calldataHash: string;
   memo: string;
+  invoiceHash?: string;
   requiresHardwareException: boolean;
   tierRequired: 'TIER_0_AUTONOMOUS' | 'TIER_1_JUNIOR' | 'TIER_2_SENIOR';
 }
@@ -121,7 +142,7 @@ export interface HardwareNode {
 export interface SecurityIncident {
   id: string;
   timestampUtc: string;
-  type: 'PANIC_TRIGGERED' | 'UNAUTHORIZED_SELECTOR' | 'NON_WHITELISTED_RECIPIENT' | 'OVER_LIMIT_ATTEMPT' | 'TAMPER_DETECTED' | 'REVOCATION_SENT';
+  type: 'PANIC_TRIGGERED' | 'UNAUTHORIZED_SELECTOR' | 'NON_WHITELISTED_RECIPIENT' | 'OVER_LIMIT_ATTEMPT' | 'TAMPER_DETECTED' | 'REVOCATION_SENT' | 'VELOCITY_FREEZE' | 'UNVERIFIED_MERCHANT' | 'MISSING_INVOICE';
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
   description: string;
   sourceNode: string;
@@ -146,4 +167,13 @@ export interface NetworkTopologyNode {
   role: string;
   status: 'HEALTHY' | 'WARN' | 'DOWN';
   hardwareAttached: string[];
+}
+
+export interface AttackResult {
+  attackId: string;
+  attackName: string;
+  status: 'IDLE' | 'RUNNING' | 'REVERTED' | 'FROZEN';
+  revertReason: string;
+  details: string;
+  timestamp: string;
 }

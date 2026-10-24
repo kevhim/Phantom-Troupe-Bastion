@@ -1,31 +1,31 @@
 import React, { useState } from 'react';
-import { Layout, ViewId } from './components/Layout';
-import { DashboardView } from './views/DashboardView';
+import { Layout, NavTab } from './components/Layout';
+import { PaymentsView } from './views/PaymentsView';
 import { ApprovalsView } from './views/ApprovalsView';
-import { SecurityView } from './views/SecurityView';
-import { SettingsView } from './views/SettingsView';
+import { RulesView } from './views/RulesView';
+import { HardwareView } from './views/HardwareView';
 
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewId>('dashboard');
+  const [currentTab, setCurrentTab] = useState<NavTab>('payments');
 
-  const renderView = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <DashboardView />;
+  const renderActiveView = () => {
+    switch (currentTab) {
+      case 'payments':
+        return <PaymentsView />;
       case 'approvals':
         return <ApprovalsView />;
-      case 'security':
-        return <SecurityView />;
-      case 'settings':
-        return <SettingsView onNavigate={(view) => setCurrentView(view as ViewId)} />;
+      case 'rules':
+        return <RulesView />;
+      case 'hardware':
+        return <HardwareView />;
       default:
-        return <DashboardView />;
+        return <PaymentsView />;
     }
   };
 
   return (
-    <Layout currentView={currentView} onViewChange={setCurrentView}>
-      {renderView()}
+    <Layout currentTab={currentTab} onTabChange={setCurrentTab}>
+      {renderActiveView()}
     </Layout>
   );
 };

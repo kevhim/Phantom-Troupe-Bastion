@@ -1,427 +1,337 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useBastionStore } from '../store/useBastionStore';
-import {
-  CheckSquare,
-  Cpu,
-  CreditCard,
-  Radio,
-  Send,
-  Key,
-  Fingerprint,
-  Check,
-  Copy,
-  Clock,
-  ShieldAlert,
-  ArrowRight
-} from 'lucide-react';
 
-// ─── OLED Page Content ──────────────────────────────────────────────
-const OledDisplay: React.FC<{
-  page: 1 | 2 | 3;
-  intent: {
-    displayAmount: number;
-    tokenSymbol: string;
-    recipientLabel: string;
-    recipient: string;
-    calldataHash: string;
-    chainId: number;
-    functionSelector: string;
-    memo: string;
-  };
-  nonce: number;
-  displayDigest: string;
-}> = ({ page, intent, nonce, displayDigest }) => {
-  return (
-    <div className="oled-screen p-4 font-mono text-[11px] leading-relaxed min-h-[180px]">
-      <div className="text-[10px] text-gray-400 mb-2 uppercase tracking-wider">
-        ESP32 #1 SSD1306 — Page {page}/3
-      </div>
-      <div className="border-t border-gray-700 pt-2">
-        {page === 1 && (
-          <>
-            <div className="text-white font-bold text-sm mb-2">PAYMENT REVIEW</div>
-            <div className="space-y-1">
-              <div><span className="text-gray-400">Amount:</span> <span className="text-white font-bold">${intent.displayAmount.toFixed(2)} {intent.tokenSymbol}</span></div>
-              <div><span className="text-gray-400">To:</span> <span className="text-white">{intent.recipientLabel}</span></div>
-              <div><span className="text-gray-400">Addr:</span> <span className="text-white text-[10px]">{intent.recipient.substring(0, 20)}...</span></div>
-              <div><span className="text-gray-400">Memo:</span> <span className="text-white">{intent.memo}</span></div>
-            </div>
-          </>
-        )}
-        {page === 2 && (
-          <>
-            <div className="text-white font-bold text-sm mb-2">CALLDATA DIGEST</div>
-            <div className="space-y-1">
-              <div><span className="text-gray-400">Chain:</span> <span className="text-white">{intent.chainId}</span></div>
-              <div><span className="text-gray-400">Selector:</span> <span className="text-white">{intent.functionSelector}</span></div>
-              <div><span className="text-gray-400">Nonce:</span> <span className="text-white">{nonce}</span></div>
-              <div className="pt-1"><span className="text-gray-400">Hash:</span></div>
-              <div className="text-white text-[9px] break-all">{intent.calldataHash}</div>
-            </div>
-          </>
-        )}
-        {page === 3 && (
-          <>
-            <div className="text-white font-bold text-sm mb-2">SIGNING CONFIRMATION</div>
-            <div className="space-y-1">
-              <div><span className="text-gray-400">Display Digest:</span></div>
-              <div className="text-white text-[9px] break-all">{displayDigest}</div>
-              <div className="pt-2 text-[#c90000] font-bold">
-                ▶ Press GPIO33 to APPROVE
-              </div>
-              <div className="text-gray-400">
-                ▶ Press GPIO32 to PANIC HALT
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ─── Signing Progress ───────────────────────────────────────────────
-const SigningProgress: React.FC<{
-  pagesScrolled: [boolean, boolean, boolean];
-  cardObserved: string;
-  esp32Signed: boolean;
-  ownerCosigned: boolean;
-  tierRequired: string;
-}> = ({ pagesScrolled, cardObserved, esp32Signed, ownerCosigned, tierRequired }) => {
-  const steps = [
-    { label: 'Page 1 Viewed', done: pagesScrolled[0] },
-    { label: 'Page 2 Viewed', done: pagesScrolled[1] },
-    { label: 'Page 3 Viewed', done: pagesScrolled[2] },
-    { label: 'RFID Card Tapped', done: cardObserved !== 'NO_CARD' },
-    { label: 'GPIO33 Button Press', done: esp32Signed },
-    ...(tierRequired === 'TIER_2_SENIOR' ? [
-      { label: 'Owner Co-Sign', done: ownerCosigned }
-    ] : []),
-  ];
-
-  return (
-    <div className="border-2 border-black p-3 bg-white">
-      <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-2">
-        Signing Pipeline
-      </div>
-      <div className="space-y-1">
-        {steps.map((step, i) => (
-          <div key={i} className="flex items-center space-x-2">
-            <span className={`w-4 h-4 flex items-center justify-center border-2 border-black text-[10px] font-bold ${
-              step.done ? 'bg-black text-white' : 'bg-white text-muted'
-            }`}>
-              {step.done ? '✓' : i + 1}
-            </span>
-            <span className={`text-xs font-mono ${step.done ? 'text-black font-bold' : 'text-muted'}`}>
-              {step.label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// ─── VIEW EXPORT ────────────────────────────────────────────────────
 export const ApprovalsView: React.FC = () => {
-  const {
-    approvalQueue,
-    activeApprovalId,
-    selectApprovalForReview,
-    cycleOledPage,
-    tapRfidCard,
-    pressApproveButton,
-    pressPanicButton,
-    signOwnerCoSignature,
-    submitApprovedIntent
-  } = useBastionStore();
+  const store = useBastionStore();
+  const approval = store.activeApproval;
 
-  const [copiedAddr, setCopiedAddr] = useState(false);
-  const activeItem = approvalQueue.find(q => q.id === activeApprovalId) || approvalQueue[0];
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedAddr(true);
-    setTimeout(() => setCopiedAddr(false), 2000);
+  const handleApprove = () => {
+    store.pressGpioApprove();
   };
 
-  // Empty state
-  if (!activeItem) {
-    return (
-      <div className="space-y-4">
-        <div className="border-b-2 border-black pb-4">
-          <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-[#c90000] mb-1.5 flex items-center space-x-2">
-            <span className="w-2 h-2 bg-[#c90000] inline-block" />
-            <span>02 / HARDWARE APPROVAL STATION</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-black leading-none uppercase">
-            ESP32 PHYSICAL SIGNING.
-          </h1>
-        </div>
-        <div className="h-[50vh] flex flex-col items-center justify-center text-center p-8 bg-white border-2 border-black">
-          <CheckSquare className="w-10 h-10 text-black mb-3" />
-          <h2 className="text-base font-sans font-extrabold uppercase tracking-[0.12em] text-black">
-            No Pending Hardware Approvals
-          </h2>
-          <p className="text-xs font-sans text-muted mt-2 max-w-sm">
-            Submit an over-$25 payment in the Dashboard to queue a hardware approval.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const handlePanic = () => {
+    store.pressGpioPanic();
+  };
 
-  const { intent, currentOledPage, pagesScrolled, weakCardRoleObserved, esp32Signature, ownerCosignVerified } = activeItem;
-  const allPagesScrolled = pagesScrolled[0] && pagesScrolled[1] && pagesScrolled[2];
-  const isReadyToSubmit = esp32Signature && (activeItem.tierRequired === 'TIER_1_JUNIOR' || ownerCosignVerified);
+  const handleQueueTestItem = () => {
+    store.runDemoExample(2);
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="border-b-2 border-black pb-4">
-        <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-[#c90000] mb-1.5 flex items-center space-x-2">
-          <span className="w-2 h-2 bg-[#c90000] inline-block" />
-          <span>02 / HARDWARE APPROVAL STATION</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-black leading-none uppercase">
-          ESP32 PHYSICAL SIGNING.
-        </h1>
-        <p className="text-sm font-sans text-muted mt-2 max-w-2xl">
-          Review the canonical EIP-712 payload on the 128×64 OLED, tap your RFID card, and physically press GPIO33 to authorize.
-        </p>
-      </div>
-
-      {/* Queue Selector */}
-      {approvalQueue.length > 1 && (
-        <div className="border-2 border-black p-3 bg-surface">
-          <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-2">
-            Pending Queue ({approvalQueue.length})
-          </div>
-          <div className="flex space-x-2">
-            {approvalQueue.map(item => (
-              <button
-                key={item.id}
-                onClick={() => selectApprovalForReview(item.id)}
-                className={`px-3 py-1.5 text-xs font-mono font-bold border-2 border-black transition-none ${
-                  item.id === activeApprovalId
-                    ? 'bg-black text-white'
-                    : 'bg-white text-black hover:bg-surface'
-                }`}
-              >
-                ${item.intent.displayAmount.toFixed(2)} → {item.intent.recipientLabel}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* OLED Simulation */}
-        <div className="xl:col-span-2 space-y-4">
-          <div className="border-2 border-black bg-white p-4">
-            <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-3 border-b border-rule-light pb-1.5 flex items-center space-x-2">
-              <Cpu className="w-3.5 h-3.5" />
-              <span>SSD1306 OLED Display (128×64)</span>
-            </div>
-
-            {/* OLED Screen */}
-            <OledDisplay
-              page={currentOledPage}
-              intent={intent}
-              nonce={activeItem.nonce}
-              displayDigest={activeItem.displayDigest}
-            />
-
-            {/* Page Navigation */}
-            <div className="flex items-center space-x-2 mt-3">
-              {([1, 2, 3] as const).map(p => (
-                <button
-                  key={p}
-                  onClick={() => cycleOledPage(p)}
-                  className={`flex-1 py-2 text-xs font-mono font-bold border-2 border-black transition-none ${
-                    currentOledPage === p
-                      ? 'bg-black text-white'
-                      : pagesScrolled[p - 1]
-                      ? 'bg-surface text-black'
-                      : 'bg-white text-muted hover:bg-surface'
-                  }`}
-                >
-                  Page {p} {pagesScrolled[p - 1] ? '✓' : ''}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Physical Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* RFID */}
-            <div className="border-2 border-black p-4 bg-white">
-              <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-3 border-b border-rule-light pb-1.5 flex items-center space-x-2">
-                <CreditCard className="w-3.5 h-3.5" />
-                <span>RC522 RFID Reader</span>
-              </div>
-              <div className="mb-3">
-                <span className="text-[10px] font-mono uppercase text-muted">Card Status: </span>
-                <span className={`text-xs font-mono font-bold px-2 py-0.5 ${
-                  weakCardRoleObserved === 'NO_CARD' ? 'bg-surface text-muted border border-black' : 'bg-black text-white'
-                }`}>
-                  {weakCardRoleObserved.replace(/_/g, ' ')}
-                </span>
-              </div>
-              <div className="space-y-2">
-                <button
-                  onClick={() => tapRfidCard('CARD_1_JUNIOR')}
-                  disabled={!allPagesScrolled}
-                  className="w-full py-2 text-xs font-bold uppercase tracking-wider border-2 border-black bg-surface hover:bg-black hover:text-white text-black transition-none disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Tap Junior Card (UID-based)
-                </button>
-                <button
-                  onClick={() => tapRfidCard('CARD_2_SENIOR')}
-                  disabled={!allPagesScrolled}
-                  className="w-full py-2 text-xs font-bold uppercase tracking-wider border-2 border-black bg-surface hover:bg-black hover:text-white text-black transition-none disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Tap Senior Card (UID-based)
-                </button>
-              </div>
-              {!allPagesScrolled && (
-                <p className="text-[10px] font-mono text-[#c90000] mt-2">
-                  ⚠ Must view all 3 OLED pages first
+    <div className="space-y-8">
+      {/* ═══ TWO-COLUMN REAL GLASS CARDS (24px PADDING) ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        {/* ═══ LEFT CARD: PENDING HARDWARE REVIEW ═══ */}
+        <div className="glass p-6 text-white/90 space-y-6 flex flex-col justify-between min-h-[520px]">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-6">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-sm font-bold tracking-wide uppercase text-white/90">
+                    Exception Review Queue
+                  </h2>
+                  <span className="font-serif italic text-xs text-white/45">§ 2.1</span>
+                </div>
+                <p className="text-xs text-white/60 mt-0.5">
+                  Dual-authorization gate for policy overrides
                 </p>
-              )}
-            </div>
-
-            {/* GPIO Buttons */}
-            <div className="border-2 border-black p-4 bg-white">
-              <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-3 border-b border-rule-light pb-1.5 flex items-center space-x-2">
-                <Radio className="w-3.5 h-3.5" />
-                <span>GPIO Hardware Buttons</span>
               </div>
-              <div className="space-y-2">
-                <button
-                  onClick={pressApproveButton}
-                  disabled={weakCardRoleObserved === 'NO_CARD' || !allPagesScrolled}
-                  className="w-full py-3 text-sm font-extrabold uppercase tracking-wider border-2 border-black bg-black text-white hover:bg-[#c90000] transition-none disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  GPIO33: APPROVE & SIGN
-                </button>
-                <button
-                  onClick={pressPanicButton}
-                  className="w-full py-3 text-sm font-extrabold uppercase tracking-wider border-2 border-[#c90000] bg-[#c90000] text-white hover:bg-black transition-none"
-                >
-                  GPIO32: PANIC HALT
-                </button>
-              </div>
-              {activeItem.tierRequired === 'TIER_2_SENIOR' && esp32Signature && !ownerCosignVerified && (
-                <button
-                  onClick={signOwnerCoSignature}
-                  className="w-full mt-3 py-2.5 text-xs font-bold uppercase tracking-wider border-2 border-black bg-surface hover:bg-black hover:text-white text-black transition-none"
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Owner Co-Sign (Tier 2 Required)</span>
-                  </div>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* ESP32 Signature Output */}
-          {esp32Signature && (
-            <div className="border-2 border-black p-4 bg-white">
-              <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-2 flex items-center space-x-2">
-                <Fingerprint className="w-3.5 h-3.5" />
-                <span>ESP32 EIP-712 Signature</span>
-              </div>
-              <div className="bg-surface p-2 border border-black text-[10px] font-mono break-all text-black">
-                {esp32Signature}
-              </div>
-              <div className="flex items-center space-x-2 mt-2">
-                <span className="px-2 py-0.5 bg-black text-white text-[10px] font-bold">VERIFIED</span>
-                <span className="text-[10px] font-mono text-muted">
-                  Signer: {activeItem.esp32SignerAddress}
+              <div className="flex items-center gap-1.5 font-mono text-[10px] text-amber-300">
+                <span className="w-1.5 h-1.5 rounded-none bg-amber-400 inline-block" />
+                <span className="uppercase tracking-wider font-bold">
+                  {store.approvalQueue.length} QUEUED
                 </span>
               </div>
             </div>
-          )}
 
-          {/* Submit Button */}
-          {isReadyToSubmit && (
-            <button
-              onClick={() => submitApprovedIntent(activeItem.id)}
-              className="w-full py-4 text-base font-extrabold uppercase tracking-[0.12em] border-2 border-black bg-black text-white hover:bg-[#c90000] transition-none flex items-center justify-center space-x-3"
-            >
-              <Send className="w-5 h-5" />
-              <span>SUBMIT APPROVED INTENT TO BUNDLER</span>
-            </button>
-          )}
+            {approval ? (
+              <div className="space-y-6">
+                {/* Tinted Amber Review Header */}
+                <div className="glass-status-amber p-4 rounded-[8px] space-y-1">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-amber-300 font-bold">
+                    <span>Awaiting Dual-Key Signature</span>
+                    <span>Policy Exceeded</span>
+                  </div>
+                  <div className="text-3xl font-mono font-bold tracking-tight text-white mt-1 tabular-nums">
+                    ${approval.amountUsdc.toFixed(2)}{' '}
+                    <span className="text-xs font-normal text-amber-200/70 font-sans">USDC</span>
+                  </div>
+                  <div className="text-[11px] text-white/70 font-sans pt-1">
+                    Exceeds the $25.00 auto-pay limit. Physical cryptographic signature required on-chain.
+                  </div>
+                </div>
+
+                {/* Glass Spec Table */}
+                <div className="glass rounded-[8px] divide-y divide-white/[0.08] text-xs overflow-hidden">
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Merchant Entity
+                    </span>
+                    <span className="text-white/90 font-bold uppercase tracking-tight">
+                      {approval.merchantName}
+                    </span>
+                  </div>
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Recipient Address
+                    </span>
+                    <span className="text-white/70 font-mono text-[11px]">
+                      {approval.recipientAddress.slice(0, 10)}...{approval.recipientAddress.slice(-6)}
+                    </span>
+                  </div>
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Invoice Reference
+                    </span>
+                    <span className="text-white/70 font-mono text-[11px]">
+                      {approval.invoiceId}
+                    </span>
+                  </div>
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                      Validity Window
+                    </span>
+                    <span className="text-emerald-300 font-mono font-bold text-[11px]">
+                      59M 30S REMAINING
+                    </span>
+                  </div>
+                </div>
+
+                <div className="glass rounded-[8px] p-3 text-[11px] text-white/70 leading-relaxed font-sans">
+                  Inspect the 3 OLED pages on the right terminal. Verify transaction digest, select an authorized RFID tier, and press <strong>GPIO 33</strong> to sign.
+                </div>
+              </div>
+            ) : (
+              <div className="py-16 text-center space-y-4">
+                <div className="w-10 h-10 rounded-[8px] glass flex items-center justify-center mx-auto text-emerald-400 font-mono text-xs font-bold">
+                  ✓
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-[0.14em] font-bold text-white/90">
+                    No Pending Exceptions
+                  </div>
+                  <p className="text-xs text-white/60 mt-1 max-w-xs mx-auto">
+                    All transactions under $25 are autonomously settled. Any transaction &gt;$25 routes here.
+                  </p>
+                </div>
+                <button
+                  onClick={handleQueueTestItem}
+                  className="glass-btn-primary py-2.5 px-4 text-xs uppercase tracking-[0.15em] font-medium transition-all cursor-pointer"
+                >
+                  Queue $50 Over-Limit Test Tx →
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-white/[0.08] text-[10px] font-mono text-white/45 uppercase tracking-widest flex items-center justify-between">
+            <span>Hardware: ESP32-WROOM-32D</span>
+            <span>Port: /dev/ttyUSB0 (Laptop B)</span>
+          </div>
         </div>
 
-        {/* Right Column: Signing Progress */}
-        <div className="space-y-4">
-          <SigningProgress
-            pagesScrolled={pagesScrolled}
-            cardObserved={weakCardRoleObserved}
-            esp32Signed={!!esp32Signature}
-            ownerCosigned={ownerCosignVerified}
-            tierRequired={activeItem.tierRequired}
-          />
+        {/* ═══ RIGHT CARD: ESP32 PHYSICAL TERMINAL TWIN ═══ */}
+        <div className="glass p-6 text-white/90 space-y-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-sm font-bold tracking-wide uppercase text-white/90">
+                    Physical Signing Terminal
+                  </h2>
+                  <span className="font-serif italic text-xs text-white/45">§ 2.2</span>
+                </div>
+                <p className="text-xs text-white/60 mt-0.5">
+                  ESP32 hardware station twin
+                </p>
+              </div>
+              <span className="text-[10px] font-mono text-white/45 uppercase tracking-widest">
+                SSD1306 128x64
+              </span>
+            </div>
 
-          {/* Intent Summary */}
-          <div className="border-2 border-black p-3 bg-white">
-            <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-2">
-              Intent Summary
-            </div>
-            <div className="space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-muted">Status</span>
-                <span className="font-bold px-1.5 py-0.5 bg-black text-white text-[10px]">
-                  {activeItem.status}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Amount</span>
-                <span className="font-bold text-black">${intent.displayAmount.toFixed(2)} {intent.tokenSymbol}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Tier</span>
-                <span className="font-bold text-black">{activeItem.tierRequired}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Nonce</span>
-                <span className="font-bold text-black">{activeItem.nonce}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Deadline</span>
-                <span className="font-bold text-black text-[10px]">
-                  {new Date(activeItem.validityDeadlineUtc).toLocaleTimeString()}
-                </span>
-              </div>
-            </div>
-          </div>
+            {/* ═══ 128x64 SSD1306 OLED SCREEN (OPAQUE BG-ZINC-950 HARDWARE INSET) ═══ */}
+            <div className="mb-6">
+              <div className="bg-zinc-950 border border-zinc-800 rounded-[8px] p-5 font-mono min-h-[154px] flex flex-col justify-between text-emerald-400 relative overflow-hidden select-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
+                {/* Header bar on OLED */}
+                <div className="flex justify-between items-center text-[10px] text-emerald-500/80 border-b border-emerald-950 pb-1.5 mb-2">
+                  <span>BASTION HW SIGNER v2</span>
+                  <span>PAGE {store.oledPage}/3</span>
+                </div>
 
-          {/* Tier Requirements */}
-          <div className="border-2 border-black p-3 bg-surface">
-            <div className="text-[11px] font-mono font-bold uppercase tracking-[0.12em] text-muted mb-2">
-              Approval Tier Requirements
+                {/* OLED Content based on page */}
+                <div className="flex-1 flex flex-col justify-center py-1">
+                  {store.oledPage === 1 && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                        AMOUNT REVIEW:
+                      </div>
+                      <div className="text-2xl font-bold text-emerald-300 tracking-wide tabular-nums">
+                        {approval ? `$${approval.amountUsdc.toFixed(2)} USDC` : '$50.00 USDC'}
+                      </div>
+                      <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
+                        POLICY: EXCEEDS $25 AUTONOMOUS
+                      </div>
+                    </div>
+                  )}
+
+                  {store.oledPage === 2 && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                        RECIPIENT REVIEW:
+                      </div>
+                      <div className="text-[11px] font-bold text-emerald-300 break-all leading-tight">
+                        {approval?.recipientAddress || '0xABCD000000000000000000000000000000001234'}
+                      </div>
+                      <div className="text-[9px] text-emerald-600 uppercase tracking-wider">
+                        LABEL: {approval?.merchantName || 'Verified Demo Cloud'}
+                      </div>
+                    </div>
+                  )}
+
+                  {store.oledPage === 3 && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-emerald-500 uppercase tracking-widest">
+                        CALLDATA DIGEST:
+                      </div>
+                      <div className="text-[10px] text-emerald-300 break-all leading-tight font-mono">
+                        {approval?.calldataDigest.slice(0, 36) || '0x22F100000000000000000000000000000000'}...
+                      </div>
+                      <div className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mt-1">
+                        TAP RFID &gt; PRESS GPIO 33
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer status on OLED */}
+                <div className="flex justify-between items-center text-[9px] text-emerald-600 border-t border-emerald-950 pt-1.5 mt-2">
+                  <span>RFID: {store.rfidState.replace('_', ' ')}</span>
+                  <span>{store.gpio33Approve ? 'SIG_READY' : 'WAITING_BTN'}</span>
+                </div>
+              </div>
+
+              {/* Prev / Next Page Buttons */}
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex gap-2">
+                  {[1, 2, 3].map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => store.setOledPage(page as 1 | 2 | 3)}
+                      className={`px-3 py-1 text-[11px] font-mono transition-all rounded-[8px] cursor-pointer ${
+                        store.oledPage === page
+                          ? 'glass-btn-primary font-bold shadow-sm'
+                          : 'glass-btn text-white/70'
+                      }`}
+                    >
+                      P0{page}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => store.setOledPage(store.oledPage > 1 ? (store.oledPage - 1 as 1 | 2 | 3) : 3)}
+                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer"
+                  >
+                    ← PREV
+                  </button>
+                  <button
+                    onClick={() => store.setOledPage(store.oledPage < 3 ? (store.oledPage + 1 as 1 | 2 | 3) : 1)}
+                    className="glass-btn px-2.5 py-1 text-xs font-mono cursor-pointer"
+                  >
+                    NEXT →
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1 text-[11px] font-mono">
-              <div className="flex items-center space-x-2">
-                <span className={`w-3 h-3 border-2 border-black ${allPagesScrolled ? 'bg-black' : 'bg-white'}`} />
-                <span className={allPagesScrolled ? 'text-black font-bold' : 'text-muted'}>OLED 3-Page Review</span>
+
+            {/* ═══ RFID & GPIO HARDWARE KEYS ═══ */}
+            <div className="space-y-4 pt-4 border-t border-white/[0.08]">
+              {/* RC522 RFID Reader */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium">
+                    RC522 RFID Authorization Tier
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] text-white/90">
+                    <span className="w-1.5 h-1.5 rounded-none bg-emerald-400 inline-block" />
+                    <span className="uppercase tracking-wider font-bold">
+                      {store.rfidState === 'NO_CARD' ? 'NO CARD' : store.rfidState === 'CARD_1_JUNIOR' ? 'CARD 1 (JUNIOR)' : 'CARD 2 (SENIOR)'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* RFID Selector Keys */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => store.setRfidState('NO_CARD')}
+                    className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
+                      store.rfidState === 'NO_CARD'
+                        ? 'glass-btn-primary font-bold'
+                        : 'glass-btn text-white/70'
+                    }`}
+                  >
+                    Eject Card
+                  </button>
+                  <button
+                    onClick={() => store.setRfidState('CARD_1_JUNIOR')}
+                    className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
+                      store.rfidState === 'CARD_1_JUNIOR'
+                        ? 'glass-btn-primary font-bold'
+                        : 'glass-btn text-white/70'
+                    }`}
+                  >
+                    Tap Card 1
+                  </button>
+                  <button
+                    onClick={() => store.setRfidState('CARD_2_SENIOR')}
+                    className={`py-2 px-2 text-[10px] uppercase tracking-wider font-mono transition-all rounded-[8px] cursor-pointer ${
+                      store.rfidState === 'CARD_2_SENIOR'
+                        ? 'glass-btn-primary font-bold'
+                        : 'glass-btn text-white/70'
+                    }`}
+                  >
+                    Tap Card 2
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className={`w-3 h-3 border-2 border-black ${weakCardRoleObserved !== 'NO_CARD' ? 'bg-black' : 'bg-white'}`} />
-                <span className={weakCardRoleObserved !== 'NO_CARD' ? 'text-black font-bold' : 'text-muted'}>RFID Card Tap (UID-only)</span>
+
+              {/* GPIO Tactile Buttons */}
+              <div className="space-y-2 pt-2">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 font-medium mb-1">
+                  Physical Tactile Key Switches
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* GPIO 33 Approve: Tinted Emerald Glass */}
+                  <button
+                    onClick={handleApprove}
+                    disabled={!approval}
+                    className="glass-status-emerald py-3 px-3 rounded-[8px] disabled:opacity-30 disabled:pointer-events-none text-emerald-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
+                  >
+                    GPIO 33: Approve
+                  </button>
+
+                  {/* GPIO 32 Panic: Tinted Crimson Glass */}
+                  <button
+                    onClick={handlePanic}
+                    className="glass-status-crimson py-3 px-3 rounded-[8px] text-rose-300 font-mono text-xs uppercase tracking-widest font-bold transition-all cursor-pointer text-center"
+                  >
+                    GPIO 32: Panic
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className={`w-3 h-3 border-2 border-black ${esp32Signature ? 'bg-black' : 'bg-white'}`} />
-                <span className={esp32Signature ? 'text-black font-bold' : 'text-muted'}>GPIO33 Button + EIP-712 Sign</span>
-              </div>
-              {activeItem.tierRequired === 'TIER_2_SENIOR' && (
-                <div className="flex items-center space-x-2">
-                  <span className={`w-3 h-3 border-2 border-black ${ownerCosignVerified ? 'bg-black' : 'bg-white'}`} />
-                  <span className={ownerCosignVerified ? 'text-black font-bold' : 'text-muted'}>Owner EOA Co-Signature</span>
+
+              {/* Generated secp256k1 Signature Hex */}
+              {store.deviceSignature && (
+                <div className="glass-well p-3 space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-emerald-300 font-bold">
+                    Generated secp256k1 Hardware Signature:
+                  </div>
+                  <div className="font-mono text-[10px] text-white/80 break-all">
+                    {store.deviceSignature}
+                  </div>
                 </div>
               )}
             </div>
@@ -431,3 +341,5 @@ export const ApprovalsView: React.FC = () => {
     </div>
   );
 };
+
+export default ApprovalsView;
