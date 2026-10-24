@@ -4,11 +4,16 @@ pragma solidity ^0.8.20;
 import "./IEntryPoint.sol";
 import "./MockToken.sol";
 
+interface IRiskCircuitBreaker {
+    function evaluateAndRecord(bytes32 sessionId, uint256 amount, uint256 dailyLimit, uint256 currentDailySpent) external returns (bool isRisky, string memory reason);
+    function isFrozen(bytes32 sessionId) external view returns (bool);
+}
+
 /**
  * @title BastionAccount
  * @notice ERC-4337 Account Abstraction Smart Account with 6-Dimension Policy Enforcement,
  *         Hardware-Assisted Physical Review (ESP32 EIP-712), Dual Owner Co-Authorization,
- *         and Independent Emergency Session Revocation.
+ *         On-Chain Risk Circuit Breaker, 3-of-5 Guardian Recovery, and Emergency Revocation.
  *
  * @dev Conforms to official hackathon challenge W3-02 (Agent Wallet: Letting AI Agents Pay Safely).
  */
@@ -20,6 +25,8 @@ contract BastionAccount is IAccount {
     address public juniorExceptionSigner;       // ESP32 #1 key (RFID Junior Card 1 selected)
     address public seniorExceptionSigner;       // ESP32 #1 key (RFID Senior Card 2 selected)
     address public revokerRole;                 // ESP32 #1 direct Wi-Fi emergency panic key
+    address public circuitBreaker;              // Risk Circuit Breaker contract
+    address public recoveryManager;             // 3-of-5 Guardian Recovery manager contract
 
     // --- On-Chain Role Ceilings ---
     uint256 public constant JUNIOR_CAP = 2000 * 1e6;   // 2,000 bUSD
@@ -75,6 +82,10 @@ contract BastionAccount is IAccount {
     event SessionRevoked(bytes32 indexed sessionId, address indexed triggeredBy, string reason);
     event SessionPaused(bytes32 indexed sessionId, bool isPaused);
     event PolicyUpdated(uint256 newPolicyVersion, uint256 maxPerTx, uint256 dailyLimit, address target, address recipient);
+    event AgentHaltedByCircuitBreaker(bytes32 indexed sessionId, string reason);
+    event OwnershipRecovered(address indexed oldOwner, address indexed newOwner);
+    event CircuitBreakerUpdated(address indexed circuitBreaker);
+    event RecoveryManagerUpdated(address indexed recoveryManager);
 
     // --- Modifiers ---
     modifier onlyOwner() {
@@ -148,6 +159,9 @@ contract BastionAccount is IAccount {
         if (revokedSessions[sId] || pausedSessions[sId]) {
             return 1; // SIG_VALIDATION_FAILED
         }
+        if (circuitBreaker != address(0) && IRiskCircuitBreaker(circuitBreaker).isFrozen(sId)) {
+            return 1; // Frozen by circuit breaker
+        }
         if (block.timestamp > sessionExpiry) {
             return 1; // Expired
         }
@@ -180,6 +194,7 @@ contract BastionAccount is IAccount {
         address recipient,
         uint256 amount
     ) external onlyEntryPointOrOwner {
+        require(agentSessionKey != address(0), "No active agent session");
         bytes32 sId = keccak256(abi.encodePacked(agentSessionKey));
         require(!revokedSessions[sId], "Session is revoked on-chain");
         require(!pausedSessions[sId], "Session is paused on-chain");
@@ -199,6 +214,21 @@ contract BastionAccount is IAccount {
         uint256 currentDay = block.timestamp / 86400;
         uint256 spentToday = dailySpent[sId][currentDay];
         require(spentToday + amount <= dailySpendLimit, "Policy violation: Daily spend cap exceeded");
+
+        // Risk Circuit Breaker check: Evaluate velocity & spending bursts
+        if (circuitBreaker != address(0)) {
+            require(!IRiskCircuitBreaker(circuitBreaker).isFrozen(sId), "Session is frozen by circuit breaker");
+            (bool isRisky, string memory reason) = IRiskCircuitBreaker(circuitBreaker).evaluateAndRecord(
+                sId,
+                amount,
+                dailySpendLimit,
+                spentToday
+            );
+            if (isRisky) {
+                emit AgentHaltedByCircuitBreaker(sId, reason);
+                return; // Stateful freeze recorded; halt without transfer and WITHOUT reverting!
+            }
+        }
 
         // Atomic accounting state update
         dailySpent[sId][currentDay] = spentToday + amount;
@@ -311,31 +341,73 @@ contract BastionAccount is IAccount {
         strictOwnerExceptionMode = enabled;
     }
 
+    function setCircuitBreaker(address _circuitBreaker) external onlyOwner {
+        circuitBreaker = _circuitBreaker;
+        emit CircuitBreakerUpdated(_circuitBreaker);
+    }
+
+    function setRecoveryManager(address _recoveryManager) external onlyOwner {
+        recoveryManager = _recoveryManager;
+        emit RecoveryManagerUpdated(_recoveryManager);
+    }
+
+    function executeRecoveryRotation(address newOwner) external {
+        require(msg.sender == recoveryManager, "Only recoveryManager can execute recovery");
+        require(newOwner != address(0), "Invalid new owner");
+        require(newOwner != owner, "Must be new owner");
+
+        address oldOwner = owner;
+        owner = newOwner;
+
+        // Invalidate current agent session key
+        bytes32 sId = keccak256(abi.encodePacked(agentSessionKey));
+        revokedSessions[sId] = true;
+        agentSessionKey = address(0);
+
+        // Advance policyVersion to invalidate all pre-existing owner exception signatures
+        policyVersion++;
+
+        emit OwnershipRecovered(oldOwner, newOwner);
+    }
+
+    function setAgentSessionKey(address _agentSessionKey, uint256 _sessionExpiry) external onlyOwner {
+        require(_agentSessionKey != address(0), "Invalid agent session key");
+        require(_sessionExpiry > block.timestamp, "Invalid expiry");
+        agentSessionKey = _agentSessionKey;
+        sessionExpiry = _sessionExpiry;
+        bytes32 sId = keccak256(abi.encodePacked(_agentSessionKey));
+        revokedSessions[sId] = false;
+        pausedSessions[sId] = false;
+    }
+
     // -------------------------------------------------------------
     // Cryptographic Helpers
     // -------------------------------------------------------------
 
     function hashPaymentIntent(PaymentIntent memory intent) public pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                PAYMENT_INTENT_TYPEHASH,
-                intent.chainId,
-                intent.verifyingAccount,
-                intent.accountNonce,
-                keccak256(bytes(intent.requestId)),
-                intent.policyVersion,
-                keccak256(bytes(intent.actorSession)),
-                keccak256(bytes(intent.approvalTier)),
-                intent.tokenAddress,
-                intent.targetContract,
-                intent.functionSelector,
-                intent.recipientAddress,
-                intent.amountBaseUnits,
-                intent.maxPerTxException,
-                intent.deadline,
-                intent.calldataHash
-            )
+        bytes memory enc1 = abi.encode(
+            PAYMENT_INTENT_TYPEHASH,
+            intent.chainId,
+            intent.verifyingAccount,
+            intent.accountNonce,
+            keccak256(bytes(intent.requestId)),
+            intent.policyVersion,
+            keccak256(bytes(intent.actorSession)),
+            keccak256(bytes(intent.approvalTier))
         );
+
+        bytes memory enc2 = abi.encode(
+            intent.tokenAddress,
+            intent.targetContract,
+            intent.functionSelector,
+            intent.recipientAddress,
+            intent.amountBaseUnits,
+            intent.maxPerTxException,
+            intent.deadline,
+            intent.calldataHash
+        );
+
+        return keccak256(abi.encodePacked(enc1, enc2));
     }
 
     function recoverSigner(bytes32 hash, bytes memory signature) public pure returns (address) {

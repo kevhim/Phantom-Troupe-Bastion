@@ -32,6 +32,46 @@ interface IAccount {
 }
 
 interface IEntryPoint {
+    event UserOperationEvent(
+        bytes32 indexed userOpHash,
+        address indexed sender,
+        address indexed paymaster,
+        uint256 nonce,
+        bool success,
+        uint256 actualGasCost,
+        uint256 actualGasUsed
+    );
+
+    event AccountDeployed(
+        bytes32 indexed userOpHash,
+        address indexed sender,
+        address factory,
+        address paymaster
+    );
+
     function handleOps(UserOperation[] calldata ops, address payable beneficiary) external;
     function getUserOpHash(UserOperation calldata userOp) external view returns (bytes32);
+    function depositTo(address account) external payable;
+    function getDepositInfo(address account) external view returns (uint256 deposit);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+enum PostOpMode {
+    opSucceeded,
+    opReverted,
+    postOpReverted
+}
+
+interface IPaymaster {
+    function validatePaymasterUserOp(
+        UserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 maxCost
+    ) external returns (bytes memory context, uint256 validationData);
+
+    function postOp(
+        PostOpMode mode,
+        bytes calldata context,
+        uint256 actualGasCost
+    ) external;
 }
