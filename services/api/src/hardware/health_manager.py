@@ -53,7 +53,6 @@ MANDATORY_APPROVAL_COMPONENTS = {
 
 AUXILIARY_COMPONENTS = {
     "camera",
-    "esp32_telemetry",
     "uno_watchdog",
     "uno_sensors",
     "uno_buzzer",
@@ -65,7 +64,7 @@ class HardwareHealthManager:
         # Component statuses categorized across Laptop A and Laptop B
         self.components: Dict[str, Dict] = {
             # Laptop B — Trusted Security & Authorization Domain
-            "esp32_signer": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "ESP32 #1 Dedicated Signer (OLED #1)"},
+            "esp32_signer": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Single ESP32 Hardware Signer (Dual OLED: Review #1 @ 0x3C, Status #2 @ 0x3D)"},
             "rfid_reader": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "RC522 SPI RFID Reader"},
             "approval_button": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "GPIO33 Physical Approval Button"},
             "panic_button": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "GPIO32 Physical Panic Button"},
@@ -76,7 +75,6 @@ class HardwareHealthManager:
             "blockchain_node": {"laptop": "B", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": True, "description": "Local Anvil Blockchain & Bundler (Port 8545)"},
 
             # Laptop A — Application & Operator Domain
-            "esp32_telemetry": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "ESP32 #2 Operator Telemetry OLED #2"},
             "uno_watchdog": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Arduino Uno #2 Watchdog / Fault Generator"},
             "camera": {"laptop": "A", "state": HardwareHealthState.HEALTHY, "last_heartbeat": time.time(), "mandatory": False, "description": "Webcam Optical Face & Liveness Verification"},
         }

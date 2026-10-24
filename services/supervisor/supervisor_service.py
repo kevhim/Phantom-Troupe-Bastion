@@ -2,7 +2,7 @@
 BASTION X v2.3 — Supervisor Authorization & Independent Audit Service
 Runs on Laptop B (Intel Core Ultra 7 155H).
 Key Capabilities:
-1. Coordinates physical ESP32 #1 signer workflow and Arduino UNO Q edge telemetry.
+1. Coordinates physical single ESP32 signer workflow and Arduino UNO Q edge telemetry.
 2. Manages independent audit checkpoint storage outside Laptop A's application database.
 3. Broadcasts direct on-chain session revocation to local Anvil RPC (Chain ID 31337).
 4. Direct hardware alarm trigger to Arduino Uno #1 5V Active Buzzer (Pin D8).

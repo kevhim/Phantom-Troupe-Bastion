@@ -24,9 +24,10 @@ All devices connect directly to Laptop A USB ports:
 | Peripheral | Controller / Pin | Function | Logic Level |
 |---|---|---|---|
 | **Webcam** | Direct USB (or built-in) | Face counting & challenge-response liveness | Optical only (Auxiliary) |
-| **ESP32 #2** | USB to Laptop A | Operator telemetry controller (NO signing keys) | 3.3V USB |
-| **OLED #2** | SDA: GPIO 21, SCL: GPIO 22 | Operator security & transaction display | 3.3V I2C (0x3C) |
 | **Arduino Uno #2** | USB to Laptop A | Watchdog, diagnostic heartbeat & fault generator | 5V Serial (9600 baud) |
+
+> [!IMPORTANT]
+> **Hardware Inventory Correction:** The physical inventory contains exactly **ONE ESP32 development board**, hosted on Laptop B. Zero ESP32s are connected to Laptop A. OLED #2 is driven directly by the single ESP32 on Laptop B at I2C address `0x3D`.
 
 > [!NOTE]
 > **v2.3 Architecture Notice:** The non-functional ESP8266 has been decommissioned. The 5V active buzzer is connected directly to **Arduino Uno #1 (Digital Pin D8)** on Laptop B. Laptop A has zero active alarm hardware dependencies.
@@ -76,18 +77,12 @@ WEB_PORT=5173
 
 ## 5. Firmware Flashing Procedures (Laptop A Devices)
 
-### A. ESP32 #2 (Operator Telemetry)
-```powershell
-# Compile & Upload via Arduino CLI
-arduino-cli compile --fqbn esp32:esp32:esp32 firmware/esp32_telemetry/esp32_telemetry.ino
-arduino-cli upload -p COM_ESP32_A --fqbn esp32:esp32:esp32 firmware/esp32_telemetry/esp32_telemetry.ino
-```
-
-### B. Arduino Uno #2 (Watchdog)
+### Arduino Uno #2 (Watchdog)
 ```powershell
 arduino-cli compile --fqbn arduino:avr:uno firmware/uno_watchdog/uno_watchdog.ino
 arduino-cli upload -p COM_UNO2_A --fqbn arduino:avr:uno firmware/uno_watchdog/uno_watchdog.ino
 ```
+*(No ESP32 firmware flashing on Laptop A — single ESP32 is flashed on Laptop B)*
 
 ---
 

@@ -23,15 +23,14 @@
 │   └── script/
 ├── firmware/
 │   ├── esp32_signer/
-│   │   └── esp32_signer.ino (Laptop B: ESP32 #1 Physical Review, OLED Pagination, RC522 SPI, GPIO Buttons, Panic RPC)
-│   ├── esp32_telemetry/
-│   │   └── esp32_telemetry.ino (Laptop A: ESP32 #2 Operator Telemetry & OLED #2 Status Node)
-│   ├── esp8266_alert/
-│   │   └── esp8266_alert.ino (Laptop A Power: Remote Wi-Fi Buzzer and Incident Alarm Node)
+│   │   ├── esp32_signer.ino (Laptop B: Single ESP32 Dedicated Signer, Dual OLED Review #1 @ 0x3C & Status #2 @ 0x3D, RC522 SPI, GPIO Buttons, Panic RPC)
+│   │   └── rules.md
 │   ├── uno_operator/
 │   │   └── uno_operator.ino (Laptop B: Uno #1 5V Active Buzzer D8, PIR, DHT11 Environmental Node; 16x2 LCD Decommissioned)
-│   └── uno_watchdog/
-│       └── uno_watchdog.ino (Laptop A: Uno #2 Auxiliary Watchdog, Heartbeat & Fault Generator)
+│   ├── uno_watchdog/
+│   │   └── uno_watchdog.ino (Laptop A: Uno #2 Auxiliary Watchdog, Heartbeat & Fault Generator)
+│   └── esp8266_alert/
+│       └── esp8266_alert.ino (Archived: Historical Reference Only; Buzzer now on Uno #1 D8)
 ├── services/
 │   ├── api/
 │   │   └── src/

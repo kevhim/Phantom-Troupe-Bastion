@@ -4,8 +4,8 @@ Read `PROJECT_MASTER.md`, `rules.md`, the complete ancestor path of nested `rule
 
 Never implement host-side ESP32 transaction signing. Real chain must enforce spending independently of agent/backend.
 Two active computers:
-- Laptop A (RTX 5060): Web console (:5173), FastAPI backend (:8000), AI purchasing agent, Adversarial Hijack Lab, OpenCV vision, SQLite DB, ESP32 #2 (OLED #2 telemetry), Uno #2 (watchdog).
-- Laptop B (Intel Ultra 7 155H): **Local Anvil Blockchain (:8545, Chain 31337)**, ERC-4337 bundler, QuotaPaymaster, GuardianRecovery, RiskCircuitBreaker, ESP32 #1 (dedicated signer + OLED #1 + RC522 + buttons), Arduino UNO Q 4GB (edge node), Arduino Uno #1 (5V Active Buzzer Pin D8 + environmental telemetry), supervisor service (:8010).
+- Laptop A (RTX 5060): Web console (:5173), FastAPI backend (:8000), AI purchasing agent, Adversarial Hijack Lab, OpenCV vision, SQLite DB, Uno #2 (watchdog). (Zero ESP32s on Laptop A).
+- Laptop B (Intel Ultra 7 155H): **Local Anvil Blockchain (:8545, Chain 31337)**, ERC-4337 bundler, QuotaPaymaster, GuardianRecovery, RiskCircuitBreaker, Single ESP32 (dedicated signer + dual OLED: OLED #1 review @ 0x3C + OLED #2 status @ 0x3D + RC522 + buttons), Arduino UNO Q 4GB (edge node), Arduino Uno #1 (5V Active Buzzer Pin D8 + environmental telemetry), supervisor service (:8010).
 - Laptop C (RTX 4060): Standby node.
 Never confuse RFID UID with cryptographic authentication.
 
@@ -17,7 +17,7 @@ BASTION X v2.3 implements:
 5. `contracts/test/WalletInvariant.t.sol`: Stateful Foundry invariant fuzzing with 16,384 calls across 256 runs verifying 10/10 security invariants.
 6. `tests/adversarial/`: 8 scripted hijack attacks proving agent financial losses never exceed daily cap.
 7. `apps/web/src/App.tsx`: 8-route React security console with interactive Hijack Lab, Guardian Recovery, QuotaPaymaster cards, and SOC.
-8. `firmware/`: Dedicated firmware for ESP32 #1, ESP32 #2, Uno #1 (5V Active Buzzer D8), Uno #2, and archived ESP8266.
+8. `firmware/`: Dedicated firmware for single ESP32 (dual OLED), Uno #1 (5V Active Buzzer D8), Uno #2, and archived ESP8266.
 9. `docs/setup/`: Standalone per-laptop deployment runbooks (`LAPTOP_A_PHASE2.md`, `LAPTOP_B_PHASE2.md`, `PHASE2_INTEGRATION.md`).
 10. `tests/`: 43 automated tests passing 100% (34 Phase 1 + 9 Phase 2 adversarial).
-11. Architectural evolution: Decommissioned ESP8266; alarm now driven locally via Arduino Uno #1 Pin D8 on Laptop B; 16x2 I2C LCD removed from all required hardware configurations with environmental telemetry moved to React dashboard.
+11. Architectural evolution: Exactly ONE physical ESP32 board in inventory (on Laptop B driving dual OLED #1 & #2); zero ESP32s on Laptop A; decommissioned ESP8266; alarm driven locally via Arduino Uno #1 Pin D8 on Laptop B; 16x2 I2C LCD removed from all required hardware configurations with environmental telemetry moved to React dashboard.

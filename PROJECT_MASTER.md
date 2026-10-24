@@ -24,10 +24,10 @@
 The agent can autonomously pay approved vendors using a restricted ERC-4337 session key, but an independent smart account enforces strict restrictions even if the agent computer is compromised. A separate ESP32 signing station reviews a canonical operation on a directly wired OLED and signs a narrowly scoped override *only following physical input*. The ESP32 can independently initiate limited-role revocation through RPC, while an UNO Q and other sensors provide correlated risk telemetry. An optional Mirage mode isolates a hostile app session from genuine wallet data and only displays explicitly synthetic fixtures.
 
 ## DECISIONS ABOUT FIVE PROPOSED UPGRADES
-1. **On-device signing (ACCEPT with conditions).** Private exception signer is provisioned and used **on ESP32 #1**, not on laptop A or its backend. ESP32's ordinary flash is **not an audited secure element**. Determine variant and provisioning; secure boot/flash encryption optional later after recovery planning. Restrict on-chain authority of this signer so theft cannot grant unlimited spending. Owner/admin root signing remains on independently managed owner wallet, never on the AI host.
-2. **Independent review (ACCEPT, rewire).** At least one 3.3V OLED connects **directly to ESP32 #1** and receives the same canonical operation used for signing. Show full address across pages, amount/token/contract/function/chain, operation fingerprint, expiration; never trust text supplied solely by laptop A. The 16x2 I2C LCD on Uno #1 is decommissioned; environmental monitoring and presence telemetry are moved directly to the React dashboard pages. Signing is rejected if the trusted OLED display is unavailable.
+1. **On-device signing (ACCEPT with conditions).** Private exception signer is provisioned and used **on the single ESP32 on Laptop B**, not on laptop A or its backend. ESP32's ordinary flash is **not an audited secure element**. Determine variant and provisioning; secure boot/flash encryption optional later after recovery planning. Restrict on-chain authority of this signer so theft cannot grant unlimited spending. Owner/admin root signing remains on independently managed owner wallet, never on the AI host. Zero ESP32s exist on Laptop A.
+2. **Independent review (ACCEPT, rewire).** Exactly ONE physical ESP32 development board is deployed (connected to Laptop B), driving dual SSD1306 OLED displays on a shared I2C bus (SDA GPIO 21, SCL GPIO 22). OLED #1 (`0x3C`) receives the canonical operation for signing, showing full address across pages, amount/token/contract/function/chain, fingerprint, and expiration (strictly fail-closed: signing is rejected if OLED #1 is unavailable or malfunctions). OLED #2 (`0x3D`) is reassigned as an auxiliary security/status display (non-blocking status; subject to address jumper 0x3D and electrical compatibility verification). The 16x2 I2C LCD on Uno #1 is decommissioned; environmental monitoring and presence telemetry are moved directly to the React dashboard pages.
 3. **Junior/Senior roles (ACCEPT as demonstration tiers).** Card 1 selects JUNIOR review and card 2 SENIOR review. RC522 UID is clonable and not strong user authentication. Contract must enforce cryptographic approval authority, low/high value caps, and independent owner signature for high-tier changes/payments. Never claim UID is a secure cryptographic factor.
-4. **Panic channel (ACCEPT with independent RPC on Laptop B).** ESP32 #1 can sign/send `revokeSession` through independent direct JSON-RPC to the local Anvil node hosted on Laptop B using its **revocation-only** role/key with funded gas. This bypasses Laptop A application software and guarantees revocation even if Laptop A is powered off. Revocation effective only when on-chain confirmed.
+4. **Panic channel (ACCEPT with independent RPC on Laptop B).** ESP32 can sign/send `revokeSession` through independent direct JSON-RPC to the local Anvil node hosted on Laptop B using its **revocation-only** role/key with funded gas. This bypasses Laptop A application software and guarantees revocation even if Laptop A is powered off. Revocation effective only when on-chain confirmed.
 5. **Mirage mode (STRETCH).** Synthetic isolated records and token fixtures only. Never redirect legitimate blockchain calls to a "fake chain" without a visible simulation label for judges; never claim this prevents violence or coercion. Quiet remote alert is possible; a buzzer is not secret when audible nearby. Trigger chain revocation separately.
 
 ## CORE SECURITY INVARIANTS
@@ -48,17 +48,17 @@ S11. No two laptop processes own the same serial device; avoid connecting unrela
 - Role: Web UI (`apps/web` :5173), FastAPI Backend (`services/api` :8000), AI Purchasing Agent, Computer Vision (Webcam), SQLite App DB, Mirage Engine, SOC Dashboard.
 - Hardware Attached:
   - Built-in / Owned Webcam (Optical Face Counting & Challenge-Response Liveness)
-  - ESP32 #2 via USB + OLED #2 (I2C: SDA 21, SCL 22) — Operator Telemetry only (NO SIGNING KEYS)
   - Arduino Uno #2 via USB — Auxiliary Watchdog, Heartbeat & Fault Generator (strictly untrusted for transactions)
 - **Security Rule: NEVER store owner root signing keys or privileged ESP32 keys on Laptop A.**
-- **v2.3 Note: ESP8266 has been decommissioned from Laptop A.**
+- **v2.3 Note: Exactly ONE physical ESP32 development board exists in inventory, allocated exclusively to Laptop B. Zero ESP32s are connected to Laptop A. ESP8266 has been decommissioned.**
 
 ### LAPTOP B (Intel Ultra 7 155H, 32GB RAM) — TRUSTED AUTHORIZATION & BLOCKCHAIN HOST
 - Role: Physical Security Gateway, Supervisor Workstation, Local Blockchain & Bundler Host, Independent Audit Storage.
 - Hardware Attached:
-  - ESP32 #1 Dedicated Hardware Signer via USB:
+  - Single ESP32 Dedicated Hardware Signer & Dual OLED Controller via USB:
     - RC522 RFID Reader (SPI: SCK 18, MISO 19, MOSI 23, SS 5, RST 27)
-    - OLED #1 Trusted Review (I2C: SDA 21, SCL 22, 4-Page Paginated Review)
+    - OLED #1 Trusted Review (I2C: SDA 21, SCL 22 @ 0x3C, 4-Page Paginated Review, Fail-Closed)
+    - OLED #2 Security & Status Display (I2C: shared SDA 21, SCL 22 @ 0x3D, Non-Blocking Status; unverified bench wiring pending jumper modification)
     - Physical Approval Button (GPIO 33, sustained press >= 1.5s)
     - Physical Panic Button (GPIO 32, instant ISR interrupt + direct Wi-Fi revocation)
   - Arduino UNO Q 4GB via USB-C (Linux edge coordinator service & gateway telemetry)

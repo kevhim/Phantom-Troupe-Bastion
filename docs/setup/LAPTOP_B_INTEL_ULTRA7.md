@@ -21,19 +21,24 @@ Laptop B is the security root of the two-machine deployment:
 ## 2. Connected Hardware & Pin Assignments
 All critical physical authorization controllers connect directly to Laptop B:
 
-### A. ESP32 #1 Dedicated Transaction Signer
-| Peripheral Component | ESP32 #1 Pin | Logic Level | Notes |
+### A. Single ESP32 Dedicated Transaction Signer & Dual OLED Controller
+| Peripheral Component | ESP32 Pin | Logic Level | Notes |
 |---|---|---|---|
 | **RC522 RFID SCK** | **GPIO 18** | 3.3V SPI | Standard SPI Clock |
 | **RC522 RFID MISO** | **GPIO 19** | 3.3V SPI | Master In Slave Out |
 | **RC522 RFID MOSI** | **GPIO 23** | 3.3V SPI | Master Out Slave In |
 | **RC522 RFID SS (SDA)** | **GPIO 5** | 3.3V SPI | Chip Select |
 | **RC522 RFID RST** | **GPIO 27** | 3.3V GPIO | Hardware Reset |
-| **SSD1306 OLED #1 SDA** | **GPIO 21** | 3.3V I2C | Trusted Review Screen (0x3C) |
+| **SSD1306 OLED #1 SDA** | **GPIO 21** | 3.3V I2C | Trusted Review Screen (`0x3C`, Fail-Closed) |
 | **SSD1306 OLED #1 SCL** | **GPIO 22** | 3.3V I2C | 4-Page Paginated Review |
+| **SSD1306 OLED #2 SDA** | **GPIO 21** | 3.3V I2C | Shared I2C bus — Security & Status Display (`0x3D`) |
+| **SSD1306 OLED #2 SCL** | **GPIO 22** | 3.3V I2C | Shared I2C bus — Status Telemetry (Non-blocking) |
 | **Approve Button** | **GPIO 33** | 3.3V (Pull-up) | `INPUT_PULLUP`, sustained press >= 1.5s |
 | **Panic Button** | **GPIO 32** | 3.3V (Pull-up) | `INPUT_PULLUP`, instant ISR interrupt |
 | **Wi-Fi Radio** | Internal Antenna | 2.4 GHz | Direct RPC broadcast to local Anvil node |
+
+> [!WARNING]
+> **UNVERIFIED PHYSICAL WIRING (OLED #2 @ 0x3D):** Standard 0.96" SSD1306 OLED displays are factory-configured to I2C address `0x3C`. Connecting both OLEDs to the same I2C bus (SDA 21, SCL 22) requires re-soldering the address select jumper on OLED #2 to `0x7A` (I2C address `0x3D`). The firmware initializes OLED #1 (`0x3C`) as fail-closed (blocks signing if missing) and OLED #2 (`0x3D`) non-blockingly so unverified hardware wiring does not impede transaction review.
 
 ### B. Arduino UNO Q 4GB (Edge Security Node)
 - Connects to Laptop B via **USB-C**.
@@ -94,7 +99,7 @@ UNO_SENSOR_PORT=COM4    # Set to your detected Arduino Uno #1 COM port
 
 ## 5. Firmware Flashing Procedures (Laptop B Devices)
 
-### A. ESP32 #1 (Dedicated Signer)
+### A. Single ESP32 Dedicated Signer (Dual OLED)
 ```powershell
 arduino-cli compile --fqbn esp32:esp32:esp32 firmware/esp32_signer/esp32_signer.ino
 arduino-cli upload -p COM_ESP32_B --fqbn esp32:esp32:esp32 firmware/esp32_signer/esp32_signer.ino

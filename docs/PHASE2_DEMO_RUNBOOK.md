@@ -8,11 +8,12 @@ This runbook specifies the step-by-step live demonstration for hackathon judges,
 - [x] **Laptop B (Intel Ultra 7 155H):**
   - Anvil Blockchain running on `:8545` (Chain ID 31337)
   - Contracts compiled and deployed: `BastionAccount`, `RiskCircuitBreaker`, `GuardianRecovery`, `QuotaPaymaster`, `MockToken`, `MockVendor`
-  - ESP32 #1 Signer connected via USB COM port (115200 baud) with OLED #1 and RC522 active
+  - Single ESP32 Signer connected via USB COM port (115200 baud) with Dual OLED (#1 review @ 0x3C, #2 status @ 0x3D) and RC522 active
+  - Arduino Uno #1 with 5V Active Buzzer on Pin D8 online
 - [x] **Laptop A (RTX 5060):**
   - FastAPI backend running on `:8000`
   - React Web UI running on `:5173`
-  - ESP32 #2 OLED telemetry and ESP8266 buzzer online
+  - Arduino Uno #2 watchdog and Webcam online (Zero ESP32s on Laptop A; ESP8266 decommissioned)
 
 ---
 
@@ -114,7 +115,7 @@ This runbook specifies the step-by-step live demonstration for hackathon judges,
 ## Scene 7 — Cyber-Physical Hardware Integration
 1. **Action:** Submit an out-of-policy transaction of 250 bUSD ($>50$ cap) requiring owner exception.
 2. **Observable Proof on Hardware:**
-   - **ESP32 #1 OLED (Laptop B):** Shows token `bUSD`, amount `250.00`, recipient prefix, and finger challenge.
+   - **Single ESP32 OLED #1 (Laptop B @ 0x3C):** Shows token `bUSD`, amount `250.00`, recipient prefix, and finger challenge. Auxiliary OLED #2 (@ 0x3D) reflects security state.
    - **RC522 RFID Reader:** Tap Senior RFID card (`331C4950`).
    - **Physical Buttons:** Press GPIO33 to generate hardware signature.
-   - **Emergency Revocation:** Press GPIO32 panic button on ESP32 to demonstrate independent hardware Wi-Fi revocation directly to the local chain, triggering ESP8266 buzzer!
+   - **Emergency Revocation:** Press GPIO32 panic button on ESP32 to demonstrate independent hardware Wi-Fi revocation directly to the local chain, triggering Arduino Uno #1 Pin D8 active buzzer!

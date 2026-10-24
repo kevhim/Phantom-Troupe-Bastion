@@ -42,8 +42,8 @@ This audit establishes the verified baseline of BASTION X prior to implementing 
 - **Python Runtime:** Python 3.14.5 with `web3`, `eth-account`, `fastapi`, `uvicorn`, `pydantic`, `reportlab`, `pytest`
 - **Node.js / Frontend:** Node.js v20.x, React 18, Vite 5.4.21, TypeScript 5.2
 - **Hardware Integration Topology:**
-  - **Laptop A (RTX 5060):** Untrusted application domain, FastAPI port 8000, Web console port 5173, OpenCV vision, ESP32 #2 telemetry, Uno #2 watchdog, ESP8266 buzzer.
-  - **Laptop B (Intel Ultra 7 155H):** Trusted security root, Anvil RPC 8545, Supervisor 8010, ESP32 #1 dedicated signer, Uno Q edge node, Uno #1 sensors, audit checkpoints.
+  - **Laptop A (RTX 5060):** Untrusted application domain, FastAPI port 8000, Web console port 5173, OpenCV vision, Uno #2 watchdog (Zero ESP32s on Laptop A; ESP8266 decommissioned).
+  - **Laptop B (Intel Ultra 7 155H):** Trusted security root, Anvil RPC 8545, Supervisor 8010, Single ESP32 dedicated signer (Dual OLED #1 & #2), Uno Q edge node, Uno #1 (Buzzer D8), audit checkpoints.
 
 ---
 

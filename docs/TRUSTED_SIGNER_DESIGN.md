@@ -1,7 +1,7 @@
 # ESP32 Transaction Signer: Trust Protocol, Signing and UX
 
 ## Purpose
-Reduce reliance on Laptop A by storing and using a limited **exception signer** on ESP32 #1. This is **not** a certified HSM, not fully air-gapped (it has Wi-Fi), not immune to physical access or malicious firmware. Owner/treasury root admin private key remains independent on supervisor wallet, never stored on the agent host.
+Reduce reliance on Laptop A by storing and using a limited **exception signer** on the single ESP32 on Laptop B. This is **not** a certified HSM, not fully air-gapped (it has Wi-Fi), not immune to physical access or malicious firmware. Owner/treasury root admin private key remains independent on supervisor wallet, never stored on the agent host. Zero ESP32s exist on Laptop A.
 
 ## Signing permissions on chain (least privilege)
 - Session agent key: ordinary allowed payments only.
@@ -51,7 +51,7 @@ The ESP32 receives unsigned requests from an untrusted computer. It doesn't need
   - Page 3: Calldata Fingerprint, Expiry Deadline, Action Status
 - Physical Pin Mapping:
   - SPI RC522 reader: SCK=GPIO18, MISO=GPIO19, MOSI=GPIO23, SS=GPIO5, RST=GPIO27
-  - I2C OLED (SSD1306): SDA=GPIO21, SCL=GPIO22
+  - I2C Dual OLED (SSD1306): SDA=GPIO21, SCL=GPIO22 (Primary Review OLED #1 at 0x3C, fail-closed; Auxiliary Status OLED #2 at 0x3D, non-blocking)
   - Approve Button: GPIO33 (INPUT_PULLUP, requires >= 1.5s sustained press)
   - Panic Button: GPIO32 (INPUT_PULLUP, instant ISR interrupt, aborts signing and invokes direct Wi-Fi RPC revocation)
 - Python Cryptographic Verification: `services/device_crypto/crypto_engine.py` implements canonical EIP-712 hashing and dual ECDSA recovery.

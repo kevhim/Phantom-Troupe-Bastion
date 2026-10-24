@@ -263,10 +263,10 @@ export default function App() {
   const [chainIntegrityValid, setChainIntegrityValid] = useState<boolean>(true);
   const [tamperSimulated, setTamperSimulated] = useState<boolean>(false);
 
-  // Hardware Components (Two-Laptop Architecture)
+  // Hardware Components (Two-Laptop Architecture with Exactly ONE ESP32)
   const [components, setComponents] = useState<Record<string, { state: string; mandatory: boolean; laptop: 'A' | 'B'; desc: string }>>({
     // Laptop B — Trusted Security & Authorization Domain
-    esp32_signer: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'ESP32 #1 Dedicated Signer (OLED #1)' },
+    esp32_signer: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Single ESP32 Signer (Dual OLED: Review #1 @ 0x3C, Status #2 @ 0x3D)' },
     rfid_reader: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'RC522 SPI RFID Reader' },
     approval_button: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'GPIO33 Physical Approve Button' },
     panic_button: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'GPIO32 Physical Panic Button' },
@@ -275,8 +275,7 @@ export default function App() {
     uno_sensors: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: 'Arduino Uno #1 (Environmental Sensors & Buzzer D8)' },
     uno_buzzer: { state: 'HEALTHY', mandatory: false, laptop: 'B', desc: '5V Active Buzzer (Uno #1 Pin D8)' },
     blockchain_node: { state: 'HEALTHY', mandatory: true, laptop: 'B', desc: 'Local Anvil Blockchain & Bundler (:8545)' },
-    // Laptop A — Application & Operator Domain
-    esp32_telemetry: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'ESP32 #2 Operator Telemetry OLED #2' },
+    // Laptop A — Application & Operator Domain (Zero ESP32 Boards)
     uno_watchdog: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'Arduino Uno #2 Watchdog / Fault Tester' },
     camera: { state: 'HEALTHY', mandatory: false, laptop: 'A', desc: 'Webcam Face & Liveness Verification' },
   });
@@ -773,7 +772,7 @@ export default function App() {
                     </div>
                     <p className="text-[11px] text-slate-400">FastAPI Backend, AI Agent, Hijack Attack Simulator, Mirage Engine, SQLite DB</p>
                     <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800 space-y-0.5">
-                      <div>Devices: ESP32 #2, Uno #2, Cam</div>
+                      <div>Devices: Uno #2 (Watchdog), HD Webcam</div>
                       <div className="text-teal-400">Status: ONLINE (Port 8000 / 5173)</div>
                     </div>
                   </div>
@@ -784,9 +783,9 @@ export default function App() {
                       <span className="font-bold text-teal-300">Laptop B — Intel Ultra 7</span>
                       <span className="text-[10px] bg-teal-900/40 text-teal-300 px-1.5 py-0.5 rounded font-mono">Security Host</span>
                     </div>
-                    <p className="text-[11px] text-slate-400">Local Anvil Blockchain (:8545), QuotaPaymaster, Guardian Recovery, ESP32 Signer #1</p>
+                    <p className="text-[11px] text-slate-400">Local Anvil Blockchain (:8545), QuotaPaymaster, Guardian Recovery, Single ESP32 Signer</p>
                     <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800 space-y-0.5">
-                      <div>Devices: ESP32 #1, UNO Q, Uno #1 (Buzzer D8), RC522</div>
+                      <div>Devices: Single ESP32 (Dual OLED #1/#2 + RC522), UNO Q, Uno #1 (Buzzer D8)</div>
                       <div className="text-teal-400">Blockchain: Anvil 31337 Online</div>
                     </div>
                   </div>
@@ -870,24 +869,24 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ESP32 #2 Operator Telemetry (OLED #2 Replica on Laptop A) */}
+              {/* OLED #2 Security & Status Telemetry (Single ESP32 on Laptop B @ 0x3D) */}
               <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <Radio className="h-4 w-4 text-purple-400" />
                     <h3 className="text-sm font-bold text-white">
-                      ESP32 #2 Operator Telemetry Screen (OLED #2 Replica on Laptop A)
+                      OLED #2 Security & Status Display (Single ESP32 on Laptop B @ 0x3D)
                     </h3>
                   </div>
-                  <span className="text-[10px] bg-amber-950/70 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded font-mono font-bold">
-                    TELEMETRY ONLY — NEVER AN APPROVAL DEVICE (ZERO SIGNING KEYS)
+                  <span className="text-[10px] bg-teal-950/70 text-teal-300 border border-teal-800/60 px-2 py-0.5 rounded font-mono font-bold">
+                    SECURITY STATUS TELEMETRY — NON-SIGNING DISPLAY (OLED #2 @ 0x3D)
                   </span>
                 </div>
                 <div className="grid grid-cols-12 gap-4 items-center">
                   <div className="col-span-6 bg-black border-2 border-slate-800 rounded p-3 font-mono text-xs text-white shadow-inner space-y-1">
                     <div className="border-b border-slate-800 pb-1 text-slate-400 text-[10px] flex justify-between">
-                      <span>[BASTION X OPERATOR]</span>
-                      <span>OLED #2</span>
+                      <span>[BASTION X OLED #2]</span>
+                      <span>ADDR: 0x3D</span>
                     </div>
                     <div className="flex justify-between text-xs pt-1">
                       <span className="text-slate-400">Agent:</span>
@@ -902,19 +901,19 @@ export default function App() {
                       <span className="text-purple-300 font-bold">$25.00 / $100</span>
                     </div>
                     <div className="flex justify-between text-[11px] border-t border-slate-800 pt-1">
-                      <span className="text-slate-400">TXs: 3</span>
-                      <span className="text-slate-300">Last: ORD-2026-09</span>
+                      <span className="text-slate-400">Chain:</span>
+                      <span className="text-teal-400">31337 (ANVIL)</span>
                     </div>
                   </div>
                   <div className="col-span-6 text-xs text-slate-400 space-y-2">
                     <p>
-                      OLED #2 is connected directly to ESP32 #2 on Laptop A (RTX 5060) via I2C (GPIO21/22).
-                      It provides live local telemetry on daily budget consumption, security status, and agent workflow activity.
+                      OLED #2 is connected directly to the single ESP32 on Laptop B (Intel Ultra 7) via shared I2C (GPIO21/22, alternate address 0x3D).
+                      It provides live physical status telemetry on daily budget consumption, security status, and chain state alongside the primary review display.
                     </p>
                     <div className="p-2.5 bg-slate-950 rounded border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
-                      <div className="text-teal-400 font-semibold">• Blockchain Status: Local Anvil (:8545) Online</div>
-                      <div>• Host Device: Laptop A USB (115200 baud)</div>
-                      <div className="text-amber-400/90 text-[10px]">🔒 Invariant: Strictly prohibited from holding keys or producing UserOp approvals.</div>
+                      <div className="text-teal-400 font-semibold">• I2C Configuration: Shared Bus (SDA GPIO21, SCL GPIO22) @ 0x3D</div>
+                      <div>• Host Device: Single ESP32 on Laptop B (Zero ESP32s on Laptop A)</div>
+                      <div className="text-amber-400/90 text-[10px]">🔒 Role: Non-signing auxiliary telemetry display (OLED #1 is the sole review device).</div>
                     </div>
                   </div>
                 </div>
@@ -1267,7 +1266,7 @@ export default function App() {
                     Physical Hardware Approvals Console
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Hardware-assisted authorization using ESP32 #1, directly wired OLED, RC522 RFID reader, and GPIO confirmation button.
+                    Hardware-assisted authorization using single ESP32, directly wired dual OLED, RC522 RFID reader, and GPIO confirmation button.
                   </p>
                 </div>
                 <div className="flex items-center space-x-2 text-xs font-mono">
@@ -1397,7 +1396,7 @@ export default function App() {
                       <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">SSD1306 128x64</span>
                     </div>
                     <p className="text-[11px] text-slate-400 mb-3">
-                      Read-only reflection of the actual physical OLED screen wired to ESP32 #1 GPIO21/22.
+                      Read-only reflection of the physical OLED review screen wired to the single ESP32 GPIO21/22 @ 0x3C.
                       Signing is strictly rejected if this display is unavailable or malfunctions.
                     </p>
 
@@ -1698,9 +1697,8 @@ export default function App() {
                   <p className="text-xs text-slate-400">Application host: React UI, FastAPI Backend, AI Purchasing Agent, Computer Vision, SQLite DB, Mirage Engine, SOC Dashboard.</p>
                   <div className="p-3 bg-slate-950 rounded border border-slate-800 font-mono text-[11px] space-y-1.5 text-slate-300">
                     <div className="text-purple-400 font-bold">• Webcam (Optical Liveness / Face Count)</div>
-                    <div>• ESP32 #2 + OLED #2 (Operator Telemetry SDA 21, SCL 22)</div>
                     <div>• Arduino Uno #2 (Watchdog / Fault Simulator)</div>
-                    <div className="text-amber-400/90 text-[10px] pt-1 border-t border-slate-800">⚠️ NO SIGNING KEYS STORED ON LAPTOP A</div>
+                    <div className="text-amber-400/90 text-[10px] pt-1 border-t border-slate-800">⚠️ ZERO ESP32 BOARDS & NO SIGNING KEYS ON LAPTOP A</div>
                   </div>
                 </div>
 
@@ -1712,7 +1710,7 @@ export default function App() {
                   </div>
                   <p className="text-xs text-slate-400">Physical security gateway, dedicated hardware signer, supervisor station, and local Anvil blockchain host.</p>
                   <div className="p-3 bg-slate-950 rounded border border-slate-800 font-mono text-[11px] space-y-1.5 text-slate-300">
-                    <div className="text-teal-400 font-bold">• ESP32 #1 Dedicated Signer (OLED #1 21/22)</div>
+                    <div className="text-teal-400 font-bold">• Single ESP32 Hardware Signer (Dual OLED: Review #1 @ 0x3C, Status #2 @ 0x3D)</div>
                     <div>• RC522 RFID SPI (SCK 18, MISO 19, MOSI 23, SS 5, RST 27)</div>
                     <div>• GPIO33 Approve Button (Sustained Press)</div>
                     <div>• GPIO32 Panic Button (Interrupt + Direct RPC Revoke)</div>
@@ -1743,13 +1741,13 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-4 text-xs font-mono">
                   <div className="p-3 bg-slate-950 rounded border border-slate-800 space-y-1 text-slate-300">
                     <div className="font-bold text-purple-300">Laptop A Connections:</div>
-                    <div>• ESP32 #2: SDA (GPIO 21), SCL (GPIO 22)</div>
                     <div>• Uno #2: Fault injection relay / heartbeat pins</div>
                     <div>• HD Webcam: USB Direct Bus</div>
+                    <div className="text-slate-400 font-semibold">• ESP32: NONE (Exactly 1 ESP32 in system, located on Laptop B)</div>
                   </div>
                   <div className="p-3 bg-slate-950 rounded border border-slate-800 space-y-1 text-slate-300">
                     <div className="font-bold text-teal-300">Laptop B Connections:</div>
-                    <div>• ESP32 #1: OLED (SDA 21, SCL 22), RFID (18, 19, 23, 5, 27)</div>
+                    <div>• Single ESP32: Dual OLED (SDA 21, SCL 22 @ 0x3C &amp; 0x3D), RFID (18, 19, 23, 5, 27)</div>
                     <div>• Buttons: Approve (GPIO 33), Panic (GPIO 32)</div>
                     <div>• Uno #1: 5V Buzzer (D8), PIR (D2), DHT11 (D4), Servo (D6)</div>
                     <div className="text-amber-400 font-semibold">• 16x2 I2C LCD: DECOMMISSIONED (Telemetry displayed on React console)</div>

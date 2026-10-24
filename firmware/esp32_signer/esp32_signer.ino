@@ -1,22 +1,28 @@
 /**
- * BASTION X v2.3 — ESP32 #1 Physical Transaction Signer Firmware
+ * BASTION X v2.3 — Single ESP32 Hardware Transaction Signer & Dual OLED Controller
  * Hardware-Assisted Out-of-Policy Review & Independent Panic Revocation
  *
- * Direct Hardware Wiring (Laptop B - Intel Core Ultra 7 155H):
+ * Mandatory Hardware Inventory: Exactly ONE ESP32 board (Laptop B - Intel Core Ultra 7 155H).
+ * There is NO second ESP32 board in this architecture.
+ *
+ * Direct Hardware Wiring on Single ESP32 (Laptop B):
  * - RC522 RFID: SCK GPIO18, MISO GPIO19, MOSI GPIO23, SS GPIO5, RST GPIO27 (3.3V SPI)
- * - SSD1306 OLED #1: SDA GPIO21, SCL GPIO22 (3.3V I2C, 0x3C)
+ * - Dual I2C OLED Displays on shared bus (SDA GPIO21, SCL GPIO22, 3.3V, GND):
+ *   * OLED #1 (0x3C): Trusted Transaction Review Screen (Mandatory. Signing strictly rejected if unavailable).
+ *   * OLED #2 (0x3D): Security & Status Telemetry Screen (Subject to I2C address jumper and electrical verification).
  * - Button #1 (PANIC): GPIO32 -> Button -> GND (INPUT_PULLUP)
  * - Button #2 (APPROVE): GPIO33 -> Button -> GND (INPUT_PULLUP)
  * - Wi-Fi: On-board 802.11b/g/n for independent direct RPC revocation broadcast
  *
  * Security Invariants:
- * 1. Signs ONLY following complete 4-page paginated OLED review, RFID scan, and sustained physical button press.
+ * 1. Signs ONLY following complete 4-page paginated OLED #1 review, RFID scan, and sustained physical button press.
  * 2. Reject signing immediately if trusted OLED #1 display is unavailable or malfunctions.
  * 3. Shows full decoded recipient address across pages, amount, token, target contract, function selector,
  *    chain ID, nonce, expiry, and transaction fingerprint.
- * 4. Private signing keys never leave device flash/memory.
- * 5. Panic button aborts signing instantly and initiates on-chain revocation directly.
- * 6. RFID UID indicates role tier (Junior/Senior); does not prove cryptographic identity.
+ * 4. OLED #2 displays non-signing telemetry, chain status, session state, and panic alerts.
+ * 5. Private signing keys never leave device flash/memory.
+ * 6. Panic button aborts signing instantly and initiates on-chain revocation directly.
+ * 7. RFID UID indicates role tier (Junior/Senior); does not prove cryptographic identity.
  */
 
 #include <Arduino.h>
@@ -28,13 +34,19 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-// OLED Configuration
+// OLED Displays Configuration (Shared I2C Bus: SDA GPIO21, SCL GPIO22)
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-bool displayHealthy = false;
+
+#define OLED1_ADDRESS 0x3C // Trusted Review Display (Default SSD1306 I2C)
+#define OLED2_ADDRESS 0x3D // Status & Security Telemetry Display (Alternate jumper)
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);        // OLED #1
+Adafruit_SSD1306 statusDisplay(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // OLED #2
+
+bool displayHealthy = false;        // OLED #1 health (Critical fail-closed gate)
+bool statusDisplayHealthy = false;  // OLED #2 health (Status / Telemetry display)
 
 // Pin Definitions matching HARDWARE_MAP.md
 #define PIN_RC522_SS   5
@@ -93,22 +105,54 @@ const char* WIFI_SSID = "Bastion_Security_LAN";
 const char* WIFI_PASS = "LocalHackathonPass";
 const char* DIRECT_RPC_URL = "http://192.168.1.100:8545"; // Direct Anvil / RPC on Laptop B
 
-void setupDisplay() {
-    if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+void renderStatusScreen(const char* sessionState, const char* circuitBreakerState, const char* budgetText) {
+    if (!statusDisplayHealthy) return;
+    statusDisplay.clearDisplay();
+    statusDisplay.setTextColor(SSD1306_WHITE);
+    statusDisplay.setTextSize(1);
+    statusDisplay.setCursor(0, 0);
+    statusDisplay.println(F("BASTION X OLED #2"));
+    statusDisplay.println(F("---------------------"));
+    statusDisplay.print(F("CHAIN: 31337 (ANVIL)\n"));
+    statusDisplay.print(F("SESSION: "));
+    statusDisplay.println(sessionState);
+    statusDisplay.print(F("CIRCUIT: "));
+    statusDisplay.println(circuitBreakerState);
+    statusDisplay.print(F("BUDGET: "));
+    statusDisplay.println(budgetText);
+    statusDisplay.display();
+}
+
+void setupDisplays() {
+    Wire.begin(21, 22);
+
+    // 1. Initialize OLED #1 (Trusted Review Screen @ 0x3C)
+    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED1_ADDRESS)) {
         displayHealthy = false;
-        Serial.println(F("{\"error\":\"OLED_INIT_FAILED\",\"message\":\"Trusted OLED #1 display unavailable or malfunctioning. Signing rejected.\"}"));
-        return;
+        Serial.println(F("{\"error\":\"OLED_1_INIT_FAILED\",\"message\":\"Trusted OLED #1 display unavailable or malfunctioning. Signing rejected.\"}"));
+    } else {
+        displayHealthy = true;
+        display.clearDisplay();
+        display.setTextColor(SSD1306_WHITE);
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        display.println(F("BASTION X v2.3"));
+        display.println(F("Single ESP32 Signer"));
+        display.println(F("Trusted OLED #1: OK"));
+        display.println(F("Status: READY"));
+        display.display();
     }
-    displayHealthy = true;
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.println(F("BASTION X v2.3"));
-    display.println(F("Hardware Signer #1"));
-    display.println(F("Trusted OLED #1: OK"));
-    display.println(F("Status: READY"));
-    display.display();
+
+    // 2. Initialize OLED #2 (Security & Status Telemetry @ 0x3D)
+    // Note: Requires I2C address jumper set to 0x3D / 0x7A on module reverse
+    if (!statusDisplay.begin(SSD1306_SWITCHCAPVCC, OLED2_ADDRESS)) {
+        statusDisplayHealthy = false;
+        Serial.println(F("{\"warn\":\"OLED_2_NOT_DETECTED\",\"address\":\"0x3D\",\"note\":\"OLED #2 unverified or jumper not set. Telemetry disabled on OLED #2.\"}"));
+    } else {
+        statusDisplayHealthy = true;
+        renderStatusScreen("ACTIVE", "HEALTHY", "$25/$100 bUSD");
+        Serial.println(F("{\"status\":\"OK\",\"node\":\"esp32_signer\",\"oled_2\":\"0x3D_OK\"}"));
+    }
 }
 
 void setup() {
@@ -119,9 +163,10 @@ void setup() {
     pinMode(PIN_BUTTON_PANIC, INPUT_PULLUP);
     pinMode(PIN_BUTTON_APPROVE, INPUT_PULLUP);
 
-    setupDisplay();
+    setupDisplays();
+
     if (displayHealthy) {
-        Serial.println(F("{\"status\":\"READY\",\"node\":\"esp32_signer\",\"display\":\"OLED_1_OK\",\"panic_pin\":32,\"approve_pin\":33}"));
+        Serial.println(F("{\"status\":\"READY\",\"node\":\"esp32_signer\",\"display\":\"OLED_1_OK\",\"oled_2_status\":\"CHECKED\",\"panic_pin\":32,\"approve_pin\":33}"));
     } else {
         Serial.println(F("{\"status\":\"DEGRADED\",\"node\":\"esp32_signer\",\"display\":\"MALFUNCTION\",\"signing_locked\":true}"));
     }
@@ -143,6 +188,7 @@ void renderPage(const char* title, const char* line1, const char* line2, const c
 
 void broadcastDirectRevocation() {
     renderPage("EMERGENCY PANIC", "Signing ABORTED", "Broadcasting revoke", "to Direct RPC...", "");
+    renderStatusScreen("REVOKED", "FROZEN", "$0.00 LOCKED");
     Serial.println(F("EMERGENCY: Broadcasting revokeSession directly over Wi-Fi..."));
 
     if (WiFi.status() == WL_CONNECTED) {
@@ -209,6 +255,7 @@ void loop() {
                     currentIntent.deadline = 300; // +300s
                     reviewStartTime = millis();
                     currentState = STATE_REVIEW_PAGE1;
+                    renderStatusScreen("REVIEWING", "HOLD_ARMED", "$250 bUSD PENDING");
                 }
             }
             break;
@@ -292,6 +339,7 @@ void loop() {
             // Check review timeout
             if (millis() - reviewStartTime > REVIEW_TIMEOUT_MS) {
                 renderPage("REVIEW TIMEOUT", "Operation expired", "Signing aborted", "", "");
+                renderStatusScreen("ACTIVE", "HEALTHY", "$25/$100 bUSD");
                 currentState = STATE_IDLE;
                 delay(2000);
             }
@@ -321,8 +369,10 @@ void loop() {
                 break;
             }
             renderPage("DEVICE SIGNED", "EIP-712 Sig Created", "Low-s canonical", "Emitted to Host", "");
+            renderStatusScreen("EXECUTED", "CONFIRMED", "$275/$2000 bUSD");
             Serial.println(F("DEVICE_SIGNATURE:0x3333333333333333333333333333333333333333333333333333333333333333"));
             delay(3000);
+            renderStatusScreen("ACTIVE", "HEALTHY", "$275/$2000 bUSD");
             currentState = STATE_IDLE;
             break;
 
