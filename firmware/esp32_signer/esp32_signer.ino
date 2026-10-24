@@ -30,6 +30,7 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 #include <MFRC522.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -43,7 +44,7 @@
 // -------------------------------------------------------------
 // Displays & Peripherals
 // -------------------------------------------------------------
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);        // OLED #1 (0x3C)
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);        // OLED #1 (0x3C) - Native Page Mode (Fixes SH1106 static)
 Adafruit_SSD1306 statusDisplay(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);  // OLED #2 (0x3D)
 
 bool displayHealthy = false;
@@ -687,11 +688,15 @@ void setup() {
 
     // I2C Dual Displays
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+    Wire.setClock(100000); // 100 kHz standard speed eliminates bus glitches / static
+    delay(150);            // Charge pump stabilization delay
 
-    // OLED #1 (0x3C) - Mandatory Trusted Display
-    if (probeI2CDevice(OLED1_I2C_ADDR) && display.begin(SSD1306_SWITCHCAPVCC, OLED1_I2C_ADDR)) {
+    // OLED #1 (0x3C) - Mandatory Trusted Display (SH1106 / SSD1306 Compatible)
+    if (probeI2CDevice(OLED1_I2C_ADDR) && display.begin(OLED1_I2C_ADDR, true)) {
         displayHealthy = true;
-        renderReviewPage("TRUSTED SIGNER", "Status: ONLINE", "Firmware: v2.3", "Dual OLED Active", "");
+        display.clearDisplay();
+        display.display();
+        renderReviewPage("TRUSTED SIGNER", "Status: ONLINE", "Firmware: v2.3", "Dual OLED Active", "NFC Card Ready");
     } else {
         displayHealthy = false;
         currentState = STATE_RECOVERY_REQUIRED;
@@ -846,7 +851,11 @@ void handleSerialCommand(const String& cmd) {
         return;
     } else if (strcmp(action, "GET_RFID_STATUS") == 0) {
         JsonDocument res;
+        byte v = rfid.PCD_ReadRegister(MFRC522::VersionReg);
+        char verHex[8];
+        snprintf(verHex, sizeof(verHex), "0x%02X", v);
         res["rfid_hardware"] = probeRFID() ? "SPI_OK" : "DISCONNECTED";
+        res["chip_version"] = verHex;
         res["enrolled_junior"] = physicalCardJuniorUID.length() > 0 ? physicalCardJuniorUID : RFID_CARD_JUNIOR_UID;
         res["enrolled_senior"] = physicalCardSeniorUID.length() > 0 ? physicalCardSeniorUID : RFID_CARD_SENIOR_UID;
         serializeJson(res, Serial);
