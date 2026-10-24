@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "origin": "ESP32_DIRECT_GPIO_PANIC",
+  "signerRole": "REVOKER_ONLY",
+  "chainId": 31337,
+  "account": "0x0000000000000000000000000000000000000011",
+  "sessionId": "agent-demo-01",
+  "localState": "PANIC_LOCAL",
+  "chainState": "NOT_SUBMITTED",
+  "eventSequence": 1,
+  "note": "Do not mark revoked until verified receipt."
+}

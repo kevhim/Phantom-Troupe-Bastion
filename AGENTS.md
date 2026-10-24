@@ -1,0 +1,3 @@
+# Agent Entry Point — Bastion X V2
+
+Read `PROJECT_MASTER.md`, `rules.md`, the complete ancestor path of nested `rules.md`, and domain docs for the component you edit. Key domains: `docs/CONTRACT_DESIGN.md`, `docs/TRUSTED_SIGNER_DESIGN.md`, `docs/HARDWARE_MAP.md`, `docs/SECURITY_THREAT_MODEL.md`. Never implement host-side ESP32 transaction signing. Real chain must enforce spending independently of agent/backend. Two computers: A RTX 5060 app/chain; B Intel physical ESP32+UNO Q/Uno/supervisor. C fallback. Never confuse RFID UID with cryptographic authentication. Current repo is architecture + schemas, not completed app code.

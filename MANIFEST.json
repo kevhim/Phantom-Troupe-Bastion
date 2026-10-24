@@ -1,0 +1,16 @@
+{
+  "project": "Bastion X W3-02",
+  "revision": "2.0",
+  "status": "architecture specification only",
+  "updated": "2026-10-24",
+  "directory_count": 114,
+  "file_count": 165,
+  "rules_count": 114,
+  "primary_files": [
+    "PROJECT_MASTER.md",
+    "docs/HARDWARE_MAP.md",
+    "docs/TRUSTED_SIGNER_DESIGN.md",
+    "docs/CONTRACT_DESIGN.md",
+    "docs/FRONTEND_SPEC.md"
+  ]
+}

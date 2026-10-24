@@ -1,0 +1,14 @@
+{
+  "intent_id": "11111111-2222-4333-8444-555555555555",
+  "chain_id": "<read from actual RPC>",
+  "smart_account": "<deployed contract>",
+  "token_address": "<deployed demo ERC20>",
+  "target_address": "<deployed demo ERC20>",
+  "selector": "0xa9059cbb",
+  "recipient": "<approved test vendor>",
+  "amount_min_units": "20000000",
+  "display_decimals": 6,
+  "created_at_utc": "2026-10-24T12:00:00Z",
+  "status": "CREATED",
+  "calldata_hash": "<canonical hash from encoder>"
+}

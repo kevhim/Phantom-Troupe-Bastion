@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "chainId": 31337,
+  "verifyingAccount": "0x0000000000000000000000000000000000000011",
+  "accountNonce": "1",
+  "requestId": "example-test-request",
+  "policyVersion": 1,
+  "actorSession": "agent-demo-01",
+  "approvalTier": "JUNIOR_EXCEPTION",
+  "tokenAddress": "0x0000000000000000000000000000000000000022",
+  "targetContract": "0x0000000000000000000000000000000000000022",
+  "functionSelector": "0xa9059cbb",
+  "recipientAddress": "0x0000000000000000000000000000000000000033",
+  "amountBaseUnits": "20000000",
+  "maxPerTxException": "25000000",
+  "deadline": 1792861200,
+  "calldataHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "note": "Illustrative typed-data shape only. Compile ABI/types and test EIP712 against Solidity before use."
+}

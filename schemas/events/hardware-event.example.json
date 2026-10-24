@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "event_id": "11111111-2222-4333-8444-555555555555",
+  "gateway_id": "intel-b-gw",
+  "gateway_seq": 1,
+  "node_id": "uno-supervisor",
+  "event_type": "approval.button_pressed",
+  "observed_at_utc": "2026-10-24T12:00:00Z",
+  "correlation_id": "66666666-7777-4888-8999-aaaaaaaaaaaa",
+  "payload": {
+    "button": "D5",
+    "state": "pressed"
+  },
+  "auth": {
+    "scheme": "hmac-sha256",
+    "key_id": "local-demo",
+    "mac_hex": "REPLACE_WITH_REAL_MAC"
+  }
+}

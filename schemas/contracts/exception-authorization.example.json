@@ -1,0 +1,22 @@
+{
+  "type": "EIP-712 operation-specific exception",
+  "domain": {
+    "name": "BastionX",
+    "version": "1",
+    "chainId": "<from RPC>",
+    "verifyingContract": "<smart account>"
+  },
+  "message": {
+    "wallet": "<smart account>",
+    "entryPoint": "<EntryPoint>",
+    "token": "<test token>",
+    "target": "<test token>",
+    "selector": "0xa9059cbb",
+    "recipient": "<approved test vendor>",
+    "amount": "250000000",
+    "calldataHash": "<calldata digest>",
+    "operationNonce": "<unique onchain nonce>",
+    "deadline": "<unix timestamp>",
+    "reasonHash": "<redacted reason hash>"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "deviceId": "signer-esp32-1",
+  "event": "PHYSICAL_REVIEW_COMPLETED",
+  "inputSources": [
+    "RC522_DIRECT_SPI",
+    "GPIO33_DIRECT"
+  ],
+  "displayedIntentDigest": "0x2222222222222222222222222222222222222222222222222222222222222222",
+  "approvalTier": "JUNIOR_EXCEPTION",
+  "signed": false,
+  "note": "Example only; RFID UID is not strong authentication."
+}

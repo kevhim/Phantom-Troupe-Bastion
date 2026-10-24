@@ -1,0 +1,3 @@
+# ESP32 #1 — Dedicated On-Device Limited Exception Signer
+
+**Source code TODO.** Firmware must: own RC522 over direct SPI; own OLED I2C and direct GPIO32/GPIO33 buttons; independently decode EIP712 `PaymentIntent` and paginate critical fields; reject stale/swapped/replayed requests; sign only with separately provisioned limited permission keys; never export private key; panic cancels pending sign and can submit signed revocation to reachable blockchain RPC independently of the laptop-A API. Full design in `docs/TRUSTED_SIGNER_DESIGN.md`; pins in `docs/HARDWARE_MAP.md`. Do not claim certified HSM protection. Verify exact ESP32 variant before secure boot/eFuse operations.
