@@ -57,6 +57,15 @@ def test_agent_pays_20_tokens_via_real_entrypoint():
     w3 = Web3(Web3.HTTPProvider(ANVIL_RPC))
     assert w3.is_connected(), f"Cannot connect to Anvil at {ANVIL_RPC}"
 
+    # Ensure fresh daily quota and unfreeze circuit breaker for independent execution
+    w3.provider.make_request("evm_increaseTime", [86400])
+    w3.provider.make_request("evm_mine", [])
+    try:
+        from services.api.src.blockchain import blockchain_client
+        blockchain_client.unfreeze_session_on_chain()
+    except Exception:
+        pass
+
     # 2. Load Deployments
     assert DEPLOYMENTS_FILE.exists(), f"deployments.json not found at {DEPLOYMENTS_FILE}"
     with open(DEPLOYMENTS_FILE, "r", encoding="utf-8") as f:

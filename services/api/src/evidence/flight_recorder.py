@@ -12,6 +12,13 @@ from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional, Tuple
 import os
 
+try:
+    from services.api.src.database import SessionLocal, AuditEntryRecord, IntegrityCheckpointRecord
+except ImportError:
+    SessionLocal = None
+    AuditEntryRecord = None
+    IntegrityCheckpointRecord = None
+
 GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
 
 
@@ -26,6 +33,7 @@ class ForensicEvent:
     sanitized_payload: Dict[str, Any]
     previous_event_hash: str
     current_event_hash: str
+    sequence: int = 0
 
     def to_canonical_json(self) -> str:
         """Produces deterministic, canonical JSON representation of fields for hashing."""
@@ -51,13 +59,23 @@ def compute_event_hash(previous_hash: str, canonical_json: str) -> str:
 
 
 class FlightRecorder:
-    def __init__(self, node_id: str = "laptop-a-main", checkpoint_storage_dir: Optional[str] = None):
+    def __init__(
+        self,
+        node_id: str = "laptop-a-main",
+        checkpoint_storage_dir: Optional[str] = None,
+        auto_persist_db: bool = True,
+    ):
         self.node_id = node_id
         self.events: List[ForensicEvent] = []
         self.last_event_hash: str = GENESIS_HASH
         self.checkpoints: Dict[str, Dict[str, Any]] = {}
         self.checkpoint_storage_dir = checkpoint_storage_dir or os.path.join(os.getcwd(), "artifacts", "checkpoints")
-        os.makedirs(self.checkpoint_storage_dir, exist_ok=True)
+        self.laptop_b_checkpoint_dir = os.getenv("LAPTOP_B_CHECKPOINT_DIR", r"C:\bastion_audit_checkpoints")
+        self.auto_persist_db = auto_persist_db
+        try:
+            os.makedirs(self.checkpoint_storage_dir, exist_ok=True)
+        except Exception:
+            pass
 
     def sanitize_payload(self, raw_payload: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -88,7 +106,7 @@ class FlightRecorder:
         timestamp: Optional[float] = None,
     ) -> ForensicEvent:
         """
-        Appends an event to the cryptographically linked hash chain.
+        Appends an event to the cryptographically linked hash chain and persists to database.
         """
         evt_id = str(uuid.uuid4())
         ts = timestamp if timestamp is not None else time.time()
@@ -105,6 +123,7 @@ class FlightRecorder:
             sanitized_payload=sanitized,
             previous_event_hash=self.last_event_hash,
             current_event_hash="",
+            sequence=len(self.events) + 1,
         )
 
         canonical_json = temp_event.to_canonical_json()
@@ -113,28 +132,133 @@ class FlightRecorder:
 
         self.events.append(temp_event)
         self.last_event_hash = current_hash
+
+        # Persist to SQLite audit_entries if enabled
+        if self.auto_persist_db and SessionLocal and AuditEntryRecord:
+            try:
+                db = SessionLocal()
+                try:
+                    record = AuditEntryRecord(
+                        sequence=temp_event.sequence,
+                        event_id=temp_event.event_id,
+                        event_source=temp_event.event_source,
+                        correlation_id=temp_event.correlation_id,
+                        event_type=temp_event.event_type,
+                        sanitized_payload_json=json.dumps(temp_event.sanitized_payload, sort_keys=True),
+                        prev_hash=temp_event.previous_event_hash,
+                        entry_hash=temp_event.current_event_hash,
+                        timestamp=temp_event.timestamp,
+                    )
+                    db.add(record)
+                    db.commit()
+                finally:
+                    db.close()
+            except Exception:
+                pass
+
         return temp_event
 
-    def create_checkpoint(self, checkpoint_id: str) -> Dict[str, Any]:
+    def create_checkpoint(self, checkpoint_id: str, export_laptop_b: bool = True) -> Dict[str, Any]:
         """
         Generates an independent periodic checkpoint designed to be stored
         on Laptop B outside of the application's writable database.
         """
+        chain_valid, _, _ = self.verify_event_chain(self.events)
         checkpoint_data = {
             "checkpoint_id": checkpoint_id,
             "created_at_utc": time.time(),
             "event_count": len(self.events),
+            "sequence_tip": len(self.events),
             "tip_event_hash": self.last_event_hash,
             "node_id": self.node_id,
+            "chain_verified": chain_valid,
         }
         self.checkpoints[checkpoint_id] = checkpoint_data
 
-        # Persist checkpoint to disk
+        # Persist checkpoint to local disk
         file_path = os.path.join(self.checkpoint_storage_dir, f"{checkpoint_id}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(checkpoint_data, f, indent=2)
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(checkpoint_data, f, indent=2)
+        except Exception:
+            pass
+
+        # Independent export for Intel Laptop B
+        exported_path = file_path
+        if export_laptop_b:
+            try:
+                os.makedirs(self.laptop_b_checkpoint_dir, exist_ok=True)
+                b_path = os.path.join(self.laptop_b_checkpoint_dir, f"{checkpoint_id}.json")
+                with open(b_path, "w", encoding="utf-8") as f:
+                    json.dump(checkpoint_data, f, indent=2)
+                exported_path = b_path
+            except Exception:
+                # If C:\ root is not writable, fallback to local path
+                exported_path = file_path
+
+        checkpoint_data["export_path"] = exported_path
+
+        # Persist to database IntegrityCheckpointRecord
+        if self.auto_persist_db and SessionLocal and IntegrityCheckpointRecord:
+            try:
+                db = SessionLocal()
+                try:
+                    rec = IntegrityCheckpointRecord(
+                        checkpoint_id=checkpoint_id,
+                        sequence_tip=len(self.events),
+                        tip_event_hash=self.last_event_hash,
+                        event_count=len(self.events),
+                        node_id=self.node_id,
+                        export_path=exported_path,
+                        verified=chain_valid,
+                    )
+                    db.add(rec)
+                    db.commit()
+                finally:
+                    db.close()
+            except Exception:
+                pass
 
         return checkpoint_data
+
+    @classmethod
+    def verify_stored_chain(cls, db_session=None) -> Tuple[bool, str, Optional[int]]:
+        """Verifies the persistent audit trail stored in SQLite."""
+        if not SessionLocal or not AuditEntryRecord:
+            return False, "Database models not available", None
+
+        close_after = False
+        db = db_session
+        if db is None:
+            db = SessionLocal()
+            close_after = True
+
+        try:
+            entries = db.query(AuditEntryRecord).order_by(AuditEntryRecord.sequence.asc()).all()
+            if not entries:
+                return True, "Stored audit chain is empty", None
+
+            reconstructed = []
+            for e in entries:
+                payload = json.loads(e.sanitized_payload_json) if e.sanitized_payload_json else {}
+                evt = ForensicEvent(
+                    event_id=e.event_id,
+                    schema_version=2,
+                    timestamp=e.timestamp,
+                    event_source=e.event_source,
+                    correlation_id=e.correlation_id,
+                    event_type=e.event_type,
+                    sanitized_payload=payload,
+                    previous_event_hash=e.prev_hash,
+                    current_event_hash=e.entry_hash,
+                    sequence=e.sequence,
+                )
+                reconstructed.append(evt)
+
+            return cls.verify_event_chain(reconstructed)
+        finally:
+            if close_after:
+                db.close()
 
     @staticmethod
     def verify_event_chain(events: List[ForensicEvent]) -> Tuple[bool, str, Optional[int]]:

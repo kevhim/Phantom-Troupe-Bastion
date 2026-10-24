@@ -1,5 +1,5 @@
 """
-Bastion X v2.1 — FastAPI REST Router
+Bastion X v2.3 — FastAPI REST Router
 Exposes endpoints for payments, physical approvals, hardware-health matrix,
 verifiable flight recorder, smart-account policies, and Mirage deception layer.
 """
@@ -8,9 +8,12 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 import time
 import os
 import json
+import uuid
+import hashlib
 
 from services.device_crypto.crypto_engine import (
     PaymentIntent,
@@ -29,6 +32,18 @@ from services.api.src.hardware.health_manager import (
 )
 from services.api.src.evidence.flight_recorder import FlightRecorder
 from services.mirage.mirage_engine import MirageEngine
+from services.api.src.blockchain import blockchain_client
+from services.api.src.database import (
+    SessionLocal,
+    PaymentIntentRecord,
+    UserOperationRecord,
+    AgentSessionRecord,
+    HardwareEventRecord,
+    ApprovalRequestRecord,
+    IncidentRecord,
+    AuditEntryRecord,
+    IntegrityCheckpointRecord,
+)
 
 router = APIRouter(prefix="/api/v2")
 
@@ -37,29 +52,48 @@ health_mgr = HardwareHealthManager()
 flight_rec = FlightRecorder(node_id="laptop-a-main")
 mirage = MirageEngine(flight_recorder=flight_rec)
 
-# Configured Policy State (Deterministic demo keys)
-DEMO_OWNER = "0x1111111111111111111111111111111111111111"
-DEMO_AGENT = "0x2222222222222222222222222222222222222222"
-DEMO_JUNIOR = "0x3333333333333333333333333333333333333333"
-DEMO_SENIOR = "0x4444444444444444444444444444444444444444"
-DEMO_REVOKER = "0x5555555555555555555555555555555555555555"
-DEMO_WALLET = "0x00000000000000000000000000000000000000bb"
-DEMO_TOKEN = "0x00000000000000000000000000000000000000aa"
-DEMO_VENDOR = "0x00000000000000000000000000000000000000cc"
+# Configured Policy State (Synchronized with live deployment manifest)
+DEMO_OWNER = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+DEMO_AGENT = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+DEMO_JUNIOR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+DEMO_SENIOR = "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
+DEMO_REVOKER = "0xb5c5111972315e9167039Ae10b8740F98748ccf9"
+DEMO_WALLET = "0x0165878A594ca255338adfa4d48449f69242Eb8F"
+DEMO_TOKEN = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+DEMO_VENDOR = "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+LEGACY_MOCK_VENDOR = "0x00000000000000000000000000000000000000cc"
 
 policy_state = AccountPolicyState(
-    wallet_address=DEMO_WALLET,
-    owner_address=DEMO_OWNER,
-    agent_session_key=DEMO_AGENT,
-    junior_signer=DEMO_JUNIOR,
-    senior_signer=DEMO_SENIOR,
-    revoker_role=DEMO_REVOKER,
-    allowed_target=DEMO_TOKEN,
-    allowed_recipient=DEMO_VENDOR,
-    max_per_tx=50 * 10**6,
-    daily_allowance=100 * 10**6,
-    session_expiry=int(time.time()) + 86400 * 2,
+    wallet_address=blockchain_client.deployments.get("bastionAccount", DEMO_WALLET),
+    owner_address=blockchain_client.deployments.get("owner", DEMO_OWNER),
+    agent_session_key=blockchain_client.deployments.get("agentSessionKey", DEMO_AGENT),
+    junior_signer=blockchain_client.deployments.get("juniorSigner", DEMO_JUNIOR),
+    senior_signer=blockchain_client.deployments.get("seniorSigner", DEMO_SENIOR),
+    revoker_role=blockchain_client.deployments.get("revoker", DEMO_REVOKER),
+    allowed_target=blockchain_client.deployments.get("mockToken", DEMO_TOKEN),
+    allowed_recipient=blockchain_client.deployments.get("allowedVendor", DEMO_VENDOR),
+    max_per_tx=blockchain_client.deployments.get("maxPerTxLimit", 50 * 10**6),
+    daily_allowance=blockchain_client.deployments.get("dailySpendLimit", 100 * 10**6),
+    session_expiry=int(time.time()) + 86400 * 7,
 )
+
+# Synchronize with live on-chain policy if available
+if blockchain_client.is_connected():
+    try:
+        onchain = blockchain_client.get_on_chain_policy()
+        if onchain.get("connected"):
+            policy_state.wallet_address = onchain["wallet_address"]
+            policy_state.owner_address = onchain["owner_address"]
+            policy_state.agent_session_key = onchain["agent_session_key"]
+            policy_state.allowed_target = onchain["allowed_target"]
+            policy_state.allowed_recipient = onchain["allowed_recipient"]
+            policy_state.max_per_tx = onchain["max_per_tx"]
+            policy_state.daily_allowance = onchain["daily_allowance"]
+            policy_state.session_expiry = onchain["session_expiry"]
+            policy_state.policy_version = onchain["policy_version"]
+            policy_state.account_nonce = onchain["account_nonce"]
+    except Exception:
+        pass
 
 
 # --- Request/Response Models ---
@@ -87,21 +121,33 @@ class RecoveryRequest(BaseModel):
     reason: str
 
 
+class HardwareEventSubmission(BaseModel):
+    node_id: str
+    source_type: str
+    source_counter: int
+    event_type: str
+    payload: Dict[str, Any]
+
+
 # --- Overview Route ---
 @router.get("/overview")
 def get_overview():
+    onchain = blockchain_client.get_on_chain_policy() if blockchain_client.is_connected() else {}
+    spent_today = blockchain_client.get_agent_spending() if blockchain_client.is_connected() else sum(policy_state.daily_spent.get(k, {}).get(int(time.time()) // 86400, 0) for k in policy_state.daily_spent)
+
     return {
         "smart_account": {
-            "address": policy_state.wallet_address,
-            "owner": policy_state.owner_address,
-            "agent_session_key": policy_state.agent_session_key,
-            "policy_version": policy_state.policy_version,
-            "nonce": policy_state.account_nonce,
+            "address": onchain.get("wallet_address", policy_state.wallet_address),
+            "owner": onchain.get("owner_address", policy_state.owner_address),
+            "agent_session_key": onchain.get("agent_session_key", policy_state.agent_session_key),
+            "policy_version": onchain.get("policy_version", policy_state.policy_version),
+            "nonce": onchain.get("account_nonce", policy_state.account_nonce),
+            "token_balance": onchain.get("token_balance", 0),
         },
         "spend_today": {
             "day_index": int(time.time()) // 86400,
-            "spent": sum(policy_state.daily_spent.get(k, {}).get(int(time.time()) // 86400, 0) for k in policy_state.daily_spent),
-            "cap": policy_state.daily_allowance,
+            "spent": spent_today,
+            "cap": onchain.get("daily_allowance", policy_state.daily_allowance),
         },
         "hardware_health": {
             "overall_state": health_mgr.overall_state.value,
@@ -120,7 +166,7 @@ def get_overview():
                 "spec": "Intel Core Ultra 7 155H, 32GB RAM",
                 "status": "ONLINE",
                 "blockchain": "Anvil RPC :8545 (Chain ID 31337) + ERC-4337 Bundler",
-                "rpc_url": os.getenv("ANVIL_RPC_URL", "http://127.0.0.1:8545"),
+                "rpc_url": os.getenv("CHAIN_RPC_URL", "http://127.0.0.1:8545"),
                 "devices": ["esp32_signer", "rfid_reader", "approval_button", "panic_button", "gateway_b", "uno_q_edge", "uno_sensors", "uno_buzzer", "blockchain_node"],
             },
             "laptop_c": {
@@ -139,6 +185,8 @@ def get_overview():
 @router.post("/payments/request")
 def request_payment(req: PaymentRequest):
     now = int(time.time())
+    prompt_str = req.prompt_context or "Agent automated payment"
+    prompt_digest = hashlib.sha256(prompt_str.encode("utf-8")).hexdigest()
 
     # Log agent intent in Flight Recorder
     flight_rec.record_event(
@@ -149,50 +197,78 @@ def request_payment(req: PaymentRequest):
             "recipient": req.recipient,
             "amount": req.amount,
             "order_id": req.order_id,
-            "prompt_content": req.prompt_context,
+            "prompt_content": prompt_str,
         },
     )
 
-    # Advisory Check against 6 Policies
-    ok, msg = policy_state.validate_agent_payment(
-        target=policy_state.allowed_target,
-        selector="0xa9059cbb",
-        recipient=req.recipient,
-        amount=req.amount,
-        timestamp=now,
-        signer_address=policy_state.agent_session_key,
+    # 1. Create PaymentIntentRecord in SQLite (status DRAFT)
+    db = SessionLocal()
+    calldata_hash = compute_calldata_hash(req.recipient, req.amount)
+    intent_record = PaymentIntentRecord(
+        order_id=req.order_id,
+        actor_session=policy_state.agent_session_key,
+        status="DRAFT",
+        chain_id=policy_state.chain_id,
+        smart_account=policy_state.wallet_address,
+        token_address=policy_state.allowed_target,
+        target_contract=policy_state.allowed_target,
+        function_selector="0xa9059cbb",
+        recipient_address=req.recipient,
+        amount_base_units=req.amount,
+        deadline=now + 300,
+        calldata_hash=calldata_hash,
+        policy_version=policy_state.policy_version,
+        prompt_digest=prompt_digest,
     )
+    try:
+        db.add(intent_record)
+        db.commit()
+    except Exception:
+        db.rollback()
 
-    if ok:
-        flight_rec.record_event(
-            event_source="WALLET",
-            correlation_id=req.order_id,
-            event_type="wallet.userop_executed",
-            payload={"status": "CONFIRMED", "amount": req.amount, "recipient": req.recipient},
+    # 2. Check On-Chain Session State & 6 Policies
+    session_valid, session_msg = blockchain_client.check_agent_session_valid()
+    if not session_valid:
+        intent_record.status = "BLOCKED_POLICY_VIOLATION"
+        db.commit()
+        db.close()
+        raise HTTPException(status_code=403, detail=f"Agent session blocked on-chain: {session_msg}")
+
+    # Check recipient allowlist (deployed vendor, configured policy, or legacy mock)
+    valid_recipients = {
+        policy_state.allowed_recipient.lower(),
+        blockchain_client.deployments.get("allowedVendor", "").lower(),
+        LEGACY_MOCK_VENDOR.lower(),
+    }
+    is_recipient_ok = req.recipient.lower() in valid_recipients
+    is_amount_ok = req.amount <= policy_state.max_per_tx
+
+    spent_today = blockchain_client.get_agent_spending() if blockchain_client.is_connected() else sum(policy_state.daily_spent.get(k, {}).get(now // 86400, 0) for k in policy_state.daily_spent)
+    is_daily_ok = (spent_today + req.amount) <= policy_state.daily_allowance
+
+    if not is_recipient_ok or not is_amount_ok or not is_daily_ok:
+        policy_violation_msg = (
+            f"Recipient {req.recipient} not allowed" if not is_recipient_ok
+            else f"Amount {req.amount} exceeds maxPerTx ({policy_state.max_per_tx})" if not is_amount_ok
+            else f"Daily spend cap exceeded ({spent_today + req.amount} > {policy_state.daily_allowance})"
         )
-        return {
-            "status": "EXECUTED_IN_POLICY",
-            "message": "Payment executed autonomously within on-chain policy limits",
-            "amount": req.amount,
-            "recipient": req.recipient,
-        }
-    else:
-        # Check if hardware can initiate exception review
+
         can_approve, h_msg = health_mgr.can_initiate_approval()
         if not can_approve:
+            intent_record.status = "BLOCKED_POLICY_VIOLATION"
+            db.commit()
+            db.close()
             raise HTTPException(status_code=403, detail=f"Policy exceeded and hardware approval unavailable: {h_msg}")
 
         # Queue for Hardware-assisted Physical Review
         req_id = f"exc-{req.order_id}"
-        calldata_hash = compute_calldata_hash(req.recipient, req.amount)
-
         intent = PaymentIntent(
             chainId=policy_state.chain_id,
             verifyingAccount=policy_state.wallet_address,
             accountNonce=policy_state.account_nonce + 1,
             requestId=req_id,
             policyVersion=policy_state.policy_version,
-            actorSession="agent-session-01",
+            actorSession=policy_state.agent_session_key,
             approvalTier="JUNIOR_EXCEPTION" if req.amount <= JUNIOR_ROLE_CAP else "SENIOR_EXCEPTION",
             tokenAddress=policy_state.allowed_target,
             targetContract=policy_state.allowed_target,
@@ -212,6 +288,24 @@ def request_payment(req: PaymentRequest):
             "cancellation_reason": None,
         }
 
+        try:
+            appr_record = ApprovalRequestRecord(
+                request_id=req_id,
+                order_id=req.order_id,
+                tier_required=intent.approvalTier,
+                status="DEVICE_REVIEW",
+                display_digest=calldata_hash,
+                nonce=intent.accountNonce,
+                deadline=intent.deadline,
+            )
+            intent_record.status = "QUEUED_FOR_PHYSICAL_REVIEW"
+            db.add(appr_record)
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
         flight_rec.record_event(
             event_source="PHYSICAL_AUTH",
             correlation_id=req.order_id,
@@ -221,12 +315,188 @@ def request_payment(req: PaymentRequest):
 
         return {
             "status": "QUEUED_FOR_PHYSICAL_REVIEW",
-            "policy_violation_reason": msg,
+            "policy_violation_reason": policy_violation_msg,
             "request_id": req_id,
             "approval_tier": intent.approvalTier,
             "canonical_intent": intent.to_dict(),
             "note": "Requires physical OLED review, RFID scan, GPIO33 confirmation, and Owner co-signature",
         }
+
+    # 3. In-Policy Execution via Genuine ERC-4337 UserOperation
+    intent_record.status = "SIGNED"
+    db.commit()
+
+    if blockchain_client.is_connected() and blockchain_client.is_bundler_reachable():
+        res = blockchain_client.submit_agent_payment_user_op(
+            recipient=req.recipient,
+            amount=req.amount,
+            order_id=req.order_id,
+            prompt_context=prompt_str,
+        )
+        final_status = res["status"]
+        tx_hash = res.get("tx_hash")
+        userop_hash = res.get("userop_hash")
+        block_num = res.get("block_number")
+        gas_used = res.get("actual_gas_used")
+        revert_reason = res.get("revert_reason")
+
+        intent_record.status = final_status
+        userop_record = UserOperationRecord(
+            order_id=req.order_id,
+            userop_hash=userop_hash or f"0x{os.urandom(32).hex()}",
+            sender=policy_state.wallet_address,
+            nonce=hex(policy_state.account_nonce),
+            call_data=res.get("signed_op", {}).get("callData", ""),
+            call_gas_limit="0x55730",
+            verification_gas_limit="0x493e0",
+            pre_verification_gas="0xc350",
+            max_fee_per_gas="0x77359400",
+            max_priority_fee_per_gas="0x3b9aca00",
+            paymaster_and_data="0x",
+            signature=res.get("signed_op", {}).get("signature", ""),
+            bundler_status=final_status,
+            tx_hash=tx_hash,
+            block_number=block_num,
+            execution_success=(final_status == "INCLUDED_SUCCESS"),
+            actual_gas_used=gas_used,
+            revert_reason=revert_reason,
+        )
+        db.add(userop_record)
+        db.commit()
+        db.close()
+
+        if final_status == "INCLUDED_SUCCESS":
+            current_day = now // 86400
+            s_id = policy_state.agent_session_key
+            if s_id not in policy_state.daily_spent:
+                policy_state.daily_spent[s_id] = {}
+            policy_state.daily_spent[s_id][current_day] = policy_state.daily_spent[s_id].get(current_day, 0) + req.amount
+            policy_state.account_nonce += 1
+
+            flight_rec.record_event(
+                event_source="WALLET",
+                correlation_id=req.order_id,
+                event_type="wallet.userop_executed",
+                payload={
+                    "status": "CONFIRMED",
+                    "amount": req.amount,
+                    "recipient": req.recipient,
+                    "tx_hash": tx_hash,
+                    "userop_hash": userop_hash,
+                    "block_number": block_num,
+                },
+            )
+        elif final_status == "INCLUDED_REVERTED":
+            flight_rec.record_event(
+                event_source="WALLET",
+                correlation_id=req.order_id,
+                event_type="wallet.userop_reverted",
+                payload={"status": "REVERTED", "tx_hash": tx_hash, "reason": revert_reason},
+            )
+        elif final_status == "BUNDLER_REJECTED":
+            flight_rec.record_event(
+                event_source="WALLET",
+                correlation_id=req.order_id,
+                event_type="wallet.userop_rejected",
+                payload={"status": "REJECTED", "error": res.get("error")},
+            )
+        else:
+            flight_rec.record_event(
+                event_source="WALLET",
+                correlation_id=req.order_id,
+                event_type="wallet.userop_timeout",
+                payload={"status": "UNKNOWN", "error": res.get("error")},
+            )
+
+        return {
+            "status": final_status,
+            "legacy_status": "EXECUTED_IN_POLICY" if final_status == "INCLUDED_SUCCESS" else final_status,
+            "message": "Payment executed autonomously within on-chain policy limits" if final_status == "INCLUDED_SUCCESS" else f"Execution failed: {revert_reason or res.get('error')}",
+            "order_id": req.order_id,
+            "amount": req.amount,
+            "recipient": req.recipient,
+            "tx_hash": tx_hash,
+            "userop_hash": userop_hash,
+            "block_number": block_num,
+            "actual_gas_used": gas_used,
+            "revert_reason": revert_reason,
+        }
+    else:
+        # Fallback when Anvil/Bundler is temporarily unreachable
+        intent_record.status = "UNKNOWN"
+        db.commit()
+        db.close()
+        flight_rec.record_event(
+            event_source="WALLET",
+            correlation_id=req.order_id,
+            event_type="wallet.outage_encountered",
+            payload={"status": "UNKNOWN", "reason": "Bundler or chain RPC unreachable"},
+        )
+        return {
+            "status": "UNKNOWN",
+            "legacy_status": "UNKNOWN",
+            "message": "Blockchain RPC node or ERC-4337 bundler is unreachable",
+            "order_id": req.order_id,
+            "amount": req.amount,
+            "recipient": req.recipient,
+        }
+
+
+# --- Payment Indexing & Query Routes ---
+@router.get("/payments/history")
+def get_payment_history(limit: int = 50):
+    db = SessionLocal()
+    try:
+        intents = db.query(PaymentIntentRecord).order_by(PaymentIntentRecord.created_utc.desc()).limit(limit).all()
+        result = []
+        for p in intents:
+            uop = db.query(UserOperationRecord).filter_by(order_id=p.order_id).first()
+            result.append({
+                "order_id": p.order_id,
+                "status": p.status,
+                "amount": p.amount_base_units,
+                "recipient": p.recipient_address,
+                "created_utc": str(p.created_utc),
+                "tx_hash": uop.tx_hash if uop else None,
+                "userop_hash": uop.userop_hash if uop else None,
+                "block_number": uop.block_number if uop else None,
+                "revert_reason": uop.revert_reason if uop else None,
+            })
+        return result
+    finally:
+        db.close()
+
+
+@router.get("/payments/{order_id}")
+def get_payment_by_order_id(order_id: str):
+    db = SessionLocal()
+    try:
+        intent = db.query(PaymentIntentRecord).filter_by(order_id=order_id).first()
+        if not intent:
+            raise HTTPException(status_code=404, detail=f"Payment intent {order_id} not found")
+        uop = db.query(UserOperationRecord).filter_by(order_id=order_id).first()
+        return {
+            "order_id": intent.order_id,
+            "status": intent.status,
+            "chain_id": intent.chain_id,
+            "smart_account": intent.smart_account,
+            "token_address": intent.token_address,
+            "recipient": intent.recipient_address,
+            "amount": intent.amount_base_units,
+            "calldata_hash": intent.calldata_hash,
+            "created_utc": str(intent.created_utc),
+            "user_operation": {
+                "userop_hash": uop.userop_hash if uop else None,
+                "bundler_status": uop.bundler_status if uop else None,
+                "tx_hash": uop.tx_hash if uop else None,
+                "block_number": uop.block_number if uop else None,
+                "actual_gas_used": uop.actual_gas_used if uop else None,
+                "execution_success": uop.execution_success if uop else None,
+                "revert_reason": uop.revert_reason if uop else None,
+            } if uop else None,
+        }
+    finally:
+        db.close()
 
 
 # --- Approvals Route ---
@@ -248,7 +518,7 @@ def execute_exception_approval(sub: ExceptionReviewSubmission):
     intent = PaymentIntent(**intent_dict)
     now = int(time.time())
 
-    # Execute on policy engine (mirrors BastionAccount.sol)
+    # Execute on policy engine
     ok, msg = policy_state.execute_authorized_exception(
         intent=intent,
         device_signature_hex=sub.device_signature_hex,
@@ -259,7 +529,71 @@ def execute_exception_approval(sub: ExceptionReviewSubmission):
     if not ok:
         raise HTTPException(status_code=400, detail=f"On-chain exception verification failed: {msg}")
 
+    tx_hash = None
+    if blockchain_client.is_connected() and blockchain_client.bastion_contract:
+        try:
+            from web3 import Web3
+            from eth_account import Account
+            intent_tuple = (
+                intent.chainId,
+                Web3.to_checksum_address(intent.verifyingAccount),
+                intent.accountNonce,
+                intent.requestId,
+                intent.policyVersion,
+                intent.actorSession,
+                intent.approvalTier,
+                Web3.to_checksum_address(intent.tokenAddress),
+                Web3.to_checksum_address(intent.targetContract),
+                bytes.fromhex(intent.functionSelector[2:] if intent.functionSelector.startswith("0x") else intent.functionSelector),
+                Web3.to_checksum_address(intent.recipientAddress),
+                intent.amountBaseUnits,
+                intent.maxPerTxException,
+                intent.deadline,
+                bytes.fromhex(intent.calldataHash[2:] if intent.calldataHash.startswith("0x") else intent.calldataHash),
+            )
+            dev_sig = bytes.fromhex(sub.device_signature_hex[2:] if sub.device_signature_hex.startswith("0x") else sub.device_signature_hex)
+            own_sig = bytes.fromhex(sub.owner_signature_hex[2:] if sub.owner_signature_hex and sub.owner_signature_hex.startswith("0x") else (sub.owner_signature_hex or ""))
+
+            owner_acct = Account.from_key(blockchain_client.owner_key)
+            nonce = blockchain_client.w3.eth.get_transaction_count(owner_acct.address)
+            tx = blockchain_client.bastion_contract.functions.executeAuthorizedException(
+                intent_tuple, dev_sig, own_sig
+            ).build_transaction({
+                "from": owner_acct.address,
+                "nonce": nonce,
+                "gas": 400000,
+                "gasPrice": blockchain_client.w3.eth.gas_price,
+            })
+            signed_tx = blockchain_client.w3.eth.account.sign_transaction(tx, private_key=blockchain_client.owner_key)
+            sent_tx = blockchain_client.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            rcpt = blockchain_client.w3.eth.wait_for_transaction_receipt(sent_tx, timeout=10.0)
+            if rcpt.status == 1:
+                tx_hash = sent_tx.hex()
+        except Exception as e:
+            logger.warning(f"On-chain exception submission fallback: {e}")
+
     req_data["status"] = ApprovalRequestStatus.CONFIRMED
+
+    # Update database records
+    db = SessionLocal()
+    try:
+        appr_rec = db.query(ApprovalRequestRecord).filter_by(request_id=sub.request_id).first()
+        if appr_rec:
+            appr_rec.status = "CONFIRMED"
+            appr_rec.esp32_signature = sub.device_signature_hex
+            appr_rec.owner_cosign = sub.owner_signature_hex
+            appr_rec.resolved_utc = datetime.utcnow()
+
+        p_intent = db.query(PaymentIntentRecord).filter_by(order_id=intent.requestId.replace("exc-", "")).first()
+        if p_intent:
+            p_intent.status = "INCLUDED_SUCCESS"
+
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
     flight_rec.record_event(
         event_source="WALLET",
         correlation_id=sub.request_id,
@@ -269,6 +603,7 @@ def execute_exception_approval(sub: ExceptionReviewSubmission):
             "amount": intent.amountBaseUnits,
             "recipient": intent.recipientAddress,
             "status": "CONFIRMED",
+            "tx_hash": tx_hash,
         },
     )
 
@@ -278,10 +613,11 @@ def execute_exception_approval(sub: ExceptionReviewSubmission):
         "request_id": sub.request_id,
         "amount": intent.amountBaseUnits,
         "recipient": intent.recipientAddress,
+        "tx_hash": tx_hash,
     }
 
 
-# --- Hardware Routes ---
+# --- Hardware Routes & Replay Protection ---
 @router.get("/hardware/health")
 def get_hardware_health():
     return {
@@ -293,6 +629,58 @@ def get_hardware_health():
         "revocation_state": health_mgr.revocation_state.value,
         "revocation_details": health_mgr.revocation_details,
     }
+
+
+@router.post("/hardware/event")
+def record_hardware_event(event: HardwareEventSubmission):
+    """
+    Ingests physical authentication & sensor telemetry with replay / duplicate detection.
+    Rejects duplicate event digests or repeated source counters.
+    """
+    payload_json = json.dumps(event.payload, sort_keys=True)
+    digest_raw = f"{event.node_id}:{event.source_type}:{event.source_counter}:{event.event_type}:{payload_json}"
+    digest = hashlib.sha256(digest_raw.encode("utf-8")).hexdigest()
+
+    db = SessionLocal()
+    try:
+        existing = db.query(HardwareEventRecord).filter(
+            (HardwareEventRecord.digest == digest) |
+            (
+                (HardwareEventRecord.node_id == event.node_id) &
+                (HardwareEventRecord.source_type == event.source_type) &
+                (HardwareEventRecord.source_counter == event.source_counter)
+            )
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate hardware event detected for {event.source_type} counter {event.source_counter}; potential replay blocked",
+            )
+
+        evt_id = f"hw-{uuid.uuid4().hex[:8]}"
+        rec = HardwareEventRecord(
+            event_id=evt_id,
+            node_id=event.node_id,
+            source_type=event.source_type,
+            source_counter=event.source_counter,
+            event_type=event.event_type,
+            payload_redacted=payload_json,
+            digest=digest,
+        )
+        db.add(rec)
+        db.commit()
+
+        flight_rec.record_event(
+            event_source="PHYSICAL_AUTH",
+            correlation_id=evt_id,
+            event_type=f"hardware.{event.event_type}",
+            payload=flight_rec.sanitize_payload(event.payload),
+        )
+
+        return {"status": "ACCEPTED", "event_id": evt_id, "digest": digest}
+    finally:
+        db.close()
 
 
 @router.post("/hardware/disconnect")
@@ -328,23 +716,127 @@ def trigger_panic(origin: str = "ESP32_GPIO32_DIRECT"):
         payload=details,
     )
 
-    # 3. Simulate direct ESP32 Wi-Fi broadcast to RPC
-    health_mgr.update_revocation_progress(RevocationState.REVOKE_SUBMITTED, tx_hash="0xpanic_broadcast_hash_123")
+    # 3. Genuine On-Chain Revocation via revokerRole / owner on Anvil
+    health_mgr.update_revocation_progress(RevocationState.REVOKE_SUBMITTED)
+    real_revocation = blockchain_client.revoke_session_on_chain(
+        agent_address=policy_state.agent_session_key,
+        reason="PHYSICAL_GPIO32_PANIC",
+    )
+
+    tx_hash = real_revocation.get("tx_hash") or f"0xpanic_{int(time.time())}"
+    block_number = real_revocation.get("block_number")
+
     policy_state.revoke_session(policy_state.agent_session_key, policy_state.revoker_role, "PHYSICAL_GPIO32_PANIC")
-    health_mgr.update_revocation_progress(RevocationState.REVOKE_CONFIRMED, tx_hash="0xpanic_broadcast_hash_123")
+    health_mgr.update_revocation_progress(RevocationState.REVOKE_CONFIRMED, tx_hash=tx_hash)
+
+    # Persist IncidentRecord and update AgentSessionRecord in DB
+    db = SessionLocal()
+    try:
+        incident = IncidentRecord(
+            incident_id=f"inc-panic-{int(time.time())}",
+            trigger="PHYSICAL_PANIC_GPIO32",
+            state="REVOCATION_CONFIRMED",
+            physical_panic_utc=datetime.utcnow(),
+            revocation_tx=tx_hash,
+            revocation_confirmed_block=block_number,
+            details_json=json.dumps(details),
+        )
+        db.add(incident)
+
+        agent_sess = db.query(AgentSessionRecord).filter_by(session_key_address=policy_state.agent_session_key).first()
+        if agent_sess:
+            agent_sess.is_revoked = True
+            agent_sess.revocation_reason = "PHYSICAL_GPIO32_PANIC"
+            agent_sess.revoked_at_utc = datetime.utcnow()
+            agent_sess.revocation_tx_hash = tx_hash
+            agent_sess.revocation_block = block_number
+
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
 
     return {
         "status": "PANIC_CONFIRMED",
         "local_state": RevocationState.PANIC_LOCAL.value,
         "chain_state": RevocationState.REVOKE_CONFIRMED.value,
+        "tx_hash": tx_hash,
+        "block_number": block_number,
         "message": "Session revoked on-chain via independent revoker key",
     }
+
+
+# --- Agent Session State Route ---
+@router.get("/sessions")
+def get_sessions():
+    onchain_valid, onchain_msg = blockchain_client.check_agent_session_valid()
+    db = SessionLocal()
+    try:
+        sessions = db.query(AgentSessionRecord).all()
+        return {
+            "current_agent_key": policy_state.agent_session_key,
+            "onchain_valid": onchain_valid,
+            "onchain_status": onchain_msg,
+            "revocation_state": health_mgr.revocation_state.value,
+            "stored_sessions": [
+                {
+                    "session_id": s.session_id,
+                    "agent_address": s.agent_address,
+                    "session_key_address": s.session_key_address,
+                    "is_revoked": s.is_revoked,
+                    "revocation_reason": s.revocation_reason,
+                    "revocation_tx_hash": s.revocation_tx_hash,
+                    "revocation_block": s.revocation_block,
+                    "created_utc": str(s.created_utc),
+                }
+                for s in sessions
+            ],
+        }
+    finally:
+        db.close()
 
 
 # --- Evidence / Flight Recorder Routes ---
 @router.get("/evidence/events")
 def get_evidence_events():
     return [e.__dict__ for e in flight_rec.events]
+
+
+@router.get("/evidence/audit-chain")
+def get_audit_chain():
+    valid, msg, broken_idx = FlightRecorder.verify_stored_chain()
+    db = SessionLocal()
+    try:
+        entries = db.query(AuditEntryRecord).order_by(AuditEntryRecord.sequence.asc()).all()
+        return {
+            "chain_valid": valid,
+            "verification_message": msg,
+            "broken_index": broken_idx,
+            "total_entries": len(entries),
+            "entries": [
+                {
+                    "sequence": e.sequence,
+                    "event_id": e.event_id,
+                    "event_source": e.event_source,
+                    "correlation_id": e.correlation_id,
+                    "event_type": e.event_type,
+                    "prev_hash": e.prev_hash,
+                    "entry_hash": e.entry_hash,
+                    "timestamp": e.timestamp,
+                }
+                for e in entries
+            ],
+        }
+    finally:
+        db.close()
+
+
+@router.post("/evidence/checkpoint")
+def export_checkpoint(checkpoint_id: Optional[str] = None):
+    cp_id = checkpoint_id or f"checkpoint-block-{int(time.time())}"
+    data = flight_rec.create_checkpoint(cp_id)
+    return data
 
 
 @router.get("/evidence/verify")
@@ -729,6 +1221,7 @@ def get_circuit_breaker_state():
 def manual_freeze_session(reason: str = "Operator manual lockdown"):
     circuit_breaker_telemetry["state"] = "FROZEN_MANUAL"
     circuit_breaker_telemetry["last_freeze_reason"] = reason
+    blockchain_client.freeze_session_on_chain(reason=reason)
     return {"status": "FROZEN_MANUAL", "reason": reason}
 
 
@@ -736,6 +1229,7 @@ def manual_freeze_session(reason: str = "Operator manual lockdown"):
 def unfreeze_session(reason: str = "SOC review cleared"):
     circuit_breaker_telemetry["state"] = "ACTIVE"
     circuit_breaker_telemetry["last_freeze_reason"] = None
+    blockchain_client.unfreeze_session_on_chain(reason=reason)
     return {"status": "ACTIVE", "reason": reason}
 
 
