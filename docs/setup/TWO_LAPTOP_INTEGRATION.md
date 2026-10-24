@@ -10,7 +10,7 @@ This document defines the complete distributed communication topology, network p
 |---|---|---|---|---|---|
 | **Laptop A** | React 18 Web Console | `5173` | HTTP / WS | Laptop A (RTX 5060) | Operator Browsers (LAN) |
 | **Laptop A** | FastAPI Application API | `8000` | HTTP / REST | Laptop A (RTX 5060) | React Frontend, AI Agent |
-| **Laptop B** | Local Anvil Blockchain | `8545` | JSON-RPC (HTTP) | Laptop B (Intel Ultra 7) | Laptop A API, ESP32 #1, Bundler |
+| **Laptop B** | Local Anvil Blockchain | `8545` | JSON-RPC (HTTP) | Laptop B (Intel Ultra 7) | Laptop A API, ESP32 Signer, Bundler |
 | **Laptop B** | ERC-4337 Bundler | `3000` | HTTP / RPC | Laptop B (Intel Ultra 7) | Laptop A API |
 | **Laptop B** | Supervisor API | `8010` | HTTP / REST | Laptop B (Intel Ultra 7) | Laptop A API, UNO Q Edge Node |
 | **Laptop B** | UNO Q Edge Coordinator | Internal | Socket / HTTP | Arduino UNO Q 4GB | Laptop B Supervisor |
@@ -28,7 +28,7 @@ sequenceDiagram
     autonumber
     participant Agent as AI Purchasing Agent (Laptop A)
     participant API as FastAPI Backend (Laptop A)
-    participant Signer as ESP32 #1 Signer (Laptop B)
+    participant Signer as Single ESP32 Signer (Laptop B)
     participant Super as Supervisor Service (Laptop B)
     participant Chain as Anvil Blockchain (Laptop B)
 
@@ -54,7 +54,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant Op as Physical Operator
-    participant Signer as ESP32 #1 Panic Button (Laptop B)
+    participant Signer as Single ESP32 Panic Button (Laptop B)
     participant Chain as Anvil Node (Laptop B)
     participant Super as Supervisor (Laptop B)
     participant Uno as Uno #1 Buzzer D8 (Laptop B)

@@ -3,7 +3,7 @@
 ## Actors and secrets
 - Agent on RTX A: can be fully malicious; only owns delegated, policy-limited key. AI tools and UI are NEVER final permission source.
 - Main API/DB on A: adversary may edit, request forged payments, disable service, mutate payload, censor telemetry, manipulate UI. Smart account still enforces agent spending bounds. Attack may also disrupt hosted blockchain RPC or bundler availability.
-- ESP32 #1: independent local parser/display/button/RFID signer with **limited-tier** key(s) and revoke capability; may be physically stolen, reprogrammed, glitched or exploited. Not a certifiable HSM. A compromised ESP32 could spend to its *on-chain-authorized* limits.
+- Single ESP32 (on Laptop B): independent local parser/dual display/button/RFID signer with **limited-tier** key(s) and revoke capability; may be physically stolen, reprogrammed, glitched or exploited. Not a certifiable HSM. A compromised ESP32 could spend to its *on-chain-authorized* limits. (Zero ESP32s on Laptop A).
 - Intel B owner/supervisor workstation: better separated from A but itself software-hosted; root owner key must not live on A or ESP32. Compromised B may compromise owner signature; out of scope for guaranteed protection.
 - Uno #1/UNO Q/Uno #2: telemetry and alarms can be spoofed or disconnected; strictly excluded from financial signer authority (16x2 LCD decommissioned; telemetry displayed on React console).
 - Blockchain: chain/RPC/bundler availability, gas and confirmation delays; on-chain verified state only after confirmation.
@@ -12,7 +12,7 @@
 | Attack | Controls | Limits |
 |---|---|---|
 | Agent session key stolen | Strict on-chain allowlists, limits, expiry, revoked session | Attacker may use remaining allowed budget before confirmed revoke |
-| Malware alters payment UI | ESP32 OLED #1 decodes canonical PaymentIntent across 4 paginated pages before direct GPIO confirmation; contract ties hash to exact execution | Malicious signer firmware, phishing, human review errors still possible; signing rejected if display fails |
+| Malware alters payment UI | Single ESP32 OLED #1 decodes canonical PaymentIntent across 4 paginated pages before direct GPIO confirmation; contract ties hash to exact execution | Malicious signer firmware, phishing, human review errors still possible; signing rejected if display fails |
 | Fake PC-B USB `APPROVED` message | Signing authority only sees direct GPIO + direct SPI RFID | Serial gateway cannot approve; ESP32 firmware must be locked down |
 | RFID UID copied | Owner-signature for high tier, on-chain capped exception keys | Junior demo role selection can be cloned; not true strong MFA |
 | Sensor disconnect | Local risk state, stop app, request on-chain revoke | On-chain controls still apply; network failure prevents new revoke |

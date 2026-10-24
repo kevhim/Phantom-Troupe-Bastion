@@ -3,7 +3,7 @@
 ## Trust-zone diagram (logical, not an assertion that code exists)
 ```
               LAPTOP A — RTX 5060 (ASSUME COMPROMISABLE)
- React UI + ESP32#2/OLED#2 telemetry -> FastAPI API -> scripted/LLM agent (limited session key)
+ React UI + Uno #2 watchdog -> FastAPI API -> scripted/LLM agent (limited session key)
        |          |      \ -> UserOp -> 4337 Bundler -> EntryPoint
        |          |                                    |
        |          +-> SQLite projections             v
@@ -14,7 +14,7 @@
              LAN, signed canonical payload (untrusted request)  |
                                  v                             |
       LAPTOP B — PHYSICAL / SUPERVISOR DOMAIN       ESP32 signed EIP-712
-   [ ESP32 #1: RC522 SPI + OLED #1 I2C + Panic GPIO + Approve GPIO ]
+   [ Single ESP32: RC522 SPI + Dual OLED (#1 review @ 0x3C, #2 status @ 0x3D) + Panic GPIO + Approve GPIO ]
            | Device-only secp256k1 exception key | revocation-only key
            | directly sends revocation to reachable chain RPC
    [ UNO Q telemetry ]  [ Uno#1 PIR/DHT (LCD removed) + Pin D8 Buzzer ]

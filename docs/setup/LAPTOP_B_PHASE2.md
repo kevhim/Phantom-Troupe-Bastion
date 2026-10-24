@@ -12,10 +12,10 @@
   - Supervisor Service (`http://0.0.0.0:8010`)
   - Forensic Flight Recorder Checkpoint Anchor
 - **Connected Hardware Peripherals:**
-  - ESP32 #1 Dedicated Signer (OLED #1 on GPIO 21/22, RC522 SPI RFID Reader, GPIO 33 Approve Button, GPIO 32 Panic Button)
+  - Single ESP32 Dedicated Signer & Dual OLED Controller (OLED #1 Review @ 0x3C, OLED #2 Status @ 0x3D on GPIO 21/22, RC522 SPI RFID Reader, GPIO 33 Approve Button, GPIO 32 Panic Button)
   - Junior RFID Card (`EE44651D`) & Senior RFID Card (`331C4950`)
   - Arduino UNO Q 4GB (Edge Security Node & Deterministic Heartbeat)
-  - Arduino Uno #1 (PIR Sensor on D2, DHT11 on D4, 16x2 LCD on A4/A5, SG90 Servo on D6)
+  - Arduino Uno #1 (5V Active Buzzer on Pin D8, PIR Sensor on D2, DHT11 on D4, SG90 Servo on D6; 16x2 LCD decommissioned)
 
 ---
 

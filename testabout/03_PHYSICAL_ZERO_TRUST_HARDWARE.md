@@ -30,13 +30,14 @@ To prove real zero-trust isolation, BASTION X physically separates the system ac
   │ • Adversarial Hijack Lab        │       │ • QuotaPaymaster.sol            │
   │ • OpenCV Vision & Face Tracking │  LAN  │ • GuardianRecovery.sol          │
   │ • Mirage Honeypot Deception     ├───────┤ • RiskCircuitBreaker.sol        │
-  │ • ESP32 #2 (Telemetry OLED #2)  │ :8545 │ • ESP32 #1 Dedicated Signer     │
-  │ • Arduino Uno #2 (Watchdog)     │       │   ├── SSD1306 0.96" OLED #1     │
-  │ • ESP8266 (Wi-Fi Buzzer Node)   │       │   ├── RC522 SPI RFID Reader     │
+  │ • Arduino Uno #2 (Watchdog)     │ :8545 │ • Single ESP32 Dedicated Signer │
+  │ • Built-in / USB Webcam         │       │   ├── SSD1306 OLED #1 (@ 0x3C)  │
+  │ • (Zero ESP32s on Laptop A)     │       │   ├── SSD1306 OLED #2 (@ 0x3D)  │
+  │ • (ESP8266 Decommissioned)      │       │   ├── RC522 SPI RFID Reader     │
   │                                 │       │   ├── GPIO 33 Approve Button    │
   │ ⚠️ NO PRIVATE SIGNING KEYS HERE │       │   └── GPIO 32 Panic Revoke      │
   │                                 │       │ • Arduino UNO Q 4GB (Edge Node) │
-  │                                 │       │ • Arduino Uno #1 (PIR, DHT, LCD)│
+  │                                 │       │ • Arduino Uno #1 (Buzzer D8)    │
   └─────────────────────────────────┘       └─────────────────────────────────┘
 ```
 
@@ -79,7 +80,7 @@ On Laptop B, we connect an **ESP32 microcontroller** with dedicated peripherals.
   1. The ESP32 immediately refuses to sign any pending transactions.
   2. The ESP32 broadcasts a pre-signed `revokeSession` transaction over its independent Wi-Fi interface directly to the blockchain on Laptop B (`:8545`).
   3. This bypasses Laptop A completely! Even if Laptop A's backend is completely frozen, crashed, or malicious, the session is revoked on-chain.
-  4. The ESP8266 remote node sounds a physical 5V active buzzer alarm and flashes an emergency LED.
+  4. Arduino Uno #1 (Pin D8) sounds a physical 5V active buzzer alarm via the Laptop B Supervisor.
 
 ---
 

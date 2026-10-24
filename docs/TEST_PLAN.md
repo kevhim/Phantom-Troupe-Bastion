@@ -15,7 +15,7 @@
 - Card 2 + direct button + independent owner signature for high-tier request -> authorized exact payment succeeds within configured on-chain cap; missing owner signature rejected, even if direct physical button was pressed.
 - Change 1 bit in token, recipient, amount, contract, function selector, chain, wallet, nonce, deadline or calldata -> approval fails.
 - Untrusted fake `APPROVE` serial packet from B or A does **not** cause signer to sign. USB debugging cannot remotely trigger sign request. Untrusted telemetry from Uno #1 cannot affect ESP32 OLED #1 truth.
-- Trusted display availability check: Disconnecting or corrupting OLED #1 causes ESP32 #1 to reject signing immediately.
+- Trusted display availability check: Disconnecting or corrupting OLED #1 causes the single ESP32 to reject signing immediately.
 - Swap intent during physical review -> review invalidated; no signature on old or new payload without fresh full review.
 - Signer reset/unplug -> no signature, no previously cached approval replay; annotate if firmware hardening unavailable.
 

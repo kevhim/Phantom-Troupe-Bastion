@@ -13,10 +13,9 @@
   - Forensic Flight Recorder Exporter (`services/api/src/evidence/`)
 - **Connected Hardware Peripherals:**
   - Standard Webcam (Face Tracking & Optical Liveness)
-  - ESP32 #2 (Operator Telemetry OLED #2 via I2C GPIO 21/22)
   - Arduino Uno #2 (Hardware Watchdog & Fault Simulator)
-  - ESP8266 NodeMCU (Remote Wi-Fi Buzzer on D1/GPIO5, LED on D4/GPIO2)
-- **Security Boundary Constraint:** Laptop A **NEVER** stores the Owner private key, the ESP32 #1 supervisor key, or guardian recovery keys.
+  - *(Zero ESP32s on Laptop A; single ESP32 is on Laptop B; ESP8266 decommissioned)*
+- **Security Boundary Constraint:** Laptop A **NEVER** stores the Owner private key, the ESP32 supervisor key, or guardian recovery keys.
 
 ---
 

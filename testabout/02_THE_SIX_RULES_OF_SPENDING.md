@@ -77,7 +77,7 @@ In a naive wallet, either the transaction fails and the company loses the opport
 ### The BASTION X Exception Workflow: Dual Authorization
 Instead of failing or disabling security, BASTION X pauses the transaction and routes it to the **Physical Hardware Review Console**:
 1. The AI agent creates a formal EIP-712 `PaymentIntent` request for 250 bUSD.
-2. The request is sent to **ESP32 #1** on Laptop B.
+2. The request is sent to the **single ESP32 signer** on Laptop B.
 3. The human operator reads the exact recipient and amount on the physical OLED screen.
 4. The human taps their Senior RFID card and presses the physical approval button.
 5. The ESP32 signs a cryptographic exception approval.

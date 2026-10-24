@@ -110,13 +110,13 @@ def get_overview():
         },
         "hosts": {
             "laptop_a": {
-                "role": "Application Host, AI Agent, Computer Vision & Operator Telemetry",
+                "role": "Application Host, AI Agent, Computer Vision & Watchdog",
                 "spec": "NVIDIA RTX 5060, 32GB RAM",
                 "status": "ONLINE",
-                "devices": ["esp32_telemetry", "uno_watchdog", "camera"],
+                "devices": ["uno_watchdog", "camera"],
             },
             "laptop_b": {
-                "role": "Trusted Authorization, Hardware Signer, Local Blockchain & Supervisor",
+                "role": "Trusted Authorization, Hardware Signer, Dual OLED Displays, Local Blockchain & Supervisor",
                 "spec": "Intel Core Ultra 7 155H, 32GB RAM",
                 "status": "ONLINE",
                 "blockchain": "Anvil RPC :8545 (Chain ID 31337) + ERC-4337 Bundler",

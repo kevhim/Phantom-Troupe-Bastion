@@ -20,10 +20,11 @@
        │ • QuotaPaymaster.sol        │ │ • Adversarial Hijack Lab    │
        │ • GuardianRecovery.sol      │ │ • OpenCV Vision & Liveness  │
        │ • RiskCircuitBreaker.sol    │ │ • Mirage Deception Engine   │
-       │ • ESP32 #1 Dedicated Signer │ │ • SQLite Forensic DB        │
-       │ • UNO Q Edge Gateway        │ │ • ESP32 #2 Telemetry OLED   │
-       │ • Arduino Uno #1 (Sensors)  │ │ • Arduino Uno #2 (Watchdog) │
-       │ • RC522 RFID SPI Reader     │ │ • ESP8266 Wi-Fi Buzzer      │
+       │ • Single ESP32 Signer       │ │ • SQLite Forensic DB        │
+       │   (Dual OLED #1 & #2)       │ │ • Arduino Uno #2 (Watchdog) │
+       │ • UNO Q Edge Gateway        │ │ • Built-in / USB Webcam     │
+       │ • Arduino Uno #1 (Buzzer D8)│ │ • (Zero ESP32s on Laptop A) │
+       │ • RC522 RFID SPI Reader     │ │ • (ESP8266 Decommissioned)  │
        └─────────────────────────────┘ └─────────────────────────────┘
 ```
 
@@ -54,7 +55,7 @@ To prevent connection refused errors, start services in the following sequence:
    ```powershell
    cd contracts && forge test
    ```
-3. On Laptop B, connect ESP32 #1 and verify hardware serial gateway.
+3. On Laptop B, connect single ESP32 (dual OLEDs) and verify hardware serial gateway.
 
 ### Step 2: Start Laptop A Services
 1. Configure `RPC_URL=http://192.168.1.100:8545` in Laptop A `.env`.

@@ -3,7 +3,7 @@ BASTION X v2.2 — Arduino UNO Q 4GB Edge Security Service
 Runs on the Linux userland of Arduino UNO Q 4GB, attached via USB-C to Laptop B.
 Responsibilities:
 - Edge telemetry collection and controller health monitoring.
-- Gateway coordination with ESP32 #1 and Uno #1.
+- Gateway coordination with single ESP32 signer and Uno #1.
 - Immediate incident event forwarding to Laptop B Supervisor.
 """
 

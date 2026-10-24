@@ -1,6 +1,6 @@
 """
 BASTION X v2.3 — Laptop B Serial Hardware Gateway
-Manages serial ports for ESP32 #1 (Signer) and Uno #1 (Status, Environmental & 5V Active Buzzer D8).
+Manages serial ports for Single ESP32 (Signer & Dual OLED) and Uno #1 (Status, Environmental & 5V Active Buzzer D8).
 Ensures each USB device has exactly ONE owning process.
 """
 

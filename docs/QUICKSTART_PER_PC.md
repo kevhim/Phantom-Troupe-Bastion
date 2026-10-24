@@ -6,14 +6,14 @@ Clone same GitHub repo (each developer separate branch, pull before work), insta
 ## A / RTX 5060
 - Install Foundry/Anvil and a compatible ERC4337 EntryPoint + local bundler (lock versions), pnpm or npm for React, Python FastAPI stack, viem, SQLite. CUDA-appropriate PyTorch only if vision/LLM really needed.
 - Run local chain, deploy mock token and BastionAccount; run 4337 policy tests and produce receipts.
-- Run API/agent/indexer and web UI; attach laptop camera and ESP32 #2 with OLED #2 over USB; no signing secret (telemetry only).
+- Run API/agent/indexer and web UI; attach laptop camera and Arduino Uno #2 over USB; zero ESP32s on Laptop A.
 - Permit inbound RPC from signed ESP32 device/Laptop B only if safe and explicitly configured; avoid exposing development Anvil publicly.
 - Assign `PC_A_URL`, `CHAIN_RPC_URL`, `BUNDLER_URL`, `CHAIN_ID` and contract addresses in A `.env` without any owner key.
 
 ## B / Intel Ultra 7 155H
-- Hardware labels: ESP32#1 signer via USB (flash/power), UNO Q USB-C, Uno#1 USB. Uno#2 **optional** on Laptop A for watchdog.
-- Use ESP-IDF and/or pinned Arduino core to program ESP32 #1; verify source library supports EIP712 Keccak + secp256k1 and recovery id, and flash signing-code constraints. Do **not** blindly enable irreversible eFuse secure boot/flash encryption in a time-limited event.
-- Attach RC522 (SPI), OLED #1 (I2C), two physical buttons directly on ESP32 as specified in HARDWARE_MAP. For first proof do fixed local test key and mock tokens only; no seed committed. Reject signing if OLED #1 display is unavailable or malfunctions.
+- Hardware labels: Single ESP32 signer (driving dual OLEDs) via USB, UNO Q USB-C, Uno#1 USB. Uno#2 on Laptop A for watchdog.
+- Use pinned Arduino core to program the single ESP32; verify source library supports EIP712 Keccak + secp256k1 and recovery id, and flash signing-code constraints. Do **not** blindly enable irreversible eFuse secure boot/flash encryption in a time-limited event.
+- Attach RC522 (SPI), OLED #1 (I2C @ 0x3C, fail-closed), OLED #2 (I2C @ 0x3D, non-blocking status), two physical buttons directly on ESP32 as specified in HARDWARE_MAP. For first proof do fixed local test key and mock tokens only; no seed committed. Reject signing if OLED #1 display is unavailable or malfunctions.
 - On Uno#1 attach 5V active buzzer (Pin D8), and optional PIR (D2) and DHT11 (D4). Note: 16x2 I2C LCD is DECOMMISSIONED; telemetry streams over serial to the React console. UNO Q starts its Linux edge health service. Only B gateway opens relevant classic Uno COM port.
 - If owner-admin wallet used for high tier, host separately from agent; NEVER import into A. `PC_B_URL`, `ESP32_SIGNER_ID`, permitted A chain RPC and B gateway address in local B config.
 
