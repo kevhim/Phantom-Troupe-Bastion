@@ -2,11 +2,13 @@
 
 ## Repository contracts
 contracts/src/BastionAccount.sol (Implemented: ERC-4337 smart account, 6 W3-02 policy dimensions, EIP-712 dual auth, emergency revoker role)
-contracts/src/IEntryPoint.sol (Implemented: ERC-4337 IAccount and IEntryPoint interfaces)
+contracts/src/IEntryPoint.sol (Implemented: Imports canonical @account-abstraction/contracts@0.6.0 interfaces)
+contracts/src/entrypoint/EntryPoint.sol (Implemented: Wraps canonical @account-abstraction/contracts/core/EntryPoint.sol)
 contracts/src/MockToken.sol (Implemented: ERC-20 bUSD 6-decimal test token)
 contracts/src/MockVendor.sol (Implemented: Authorized merchant contract)
+services/bundler/bundler_service.py (Implemented: Genuine ERC-4337 v0.6 Bundler RPC service on port 3000)
 ```
-Status: Implemented and validated in BASTION X v2.1.
+Status: Phase 1 — Real ERC-4337 Foundation Verified & Operational on Anvil (Chain ID 31337). All 26 Foundry test suites and pytest E2E integration test pass 100%.
 
 ## Mandatory compliance
 - Genuine ERC-4337 `UserOperation` to an `EntryPoint`, submitted by compatible bundler, not only ordinary EOA calls.

@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bastion X Contract Events Specification",
+  "events": [
+    {
+      "name": "PaymentExecuted",
+      "signature": "PaymentExecuted(bytes32,address,uint256,uint256)",
+      "topic0": "0x312e4c92db7cf027c0ee62a620577affea3fb8f77304ab79bd7db2d877f13dae",
+      "inputs": [
+        { "name": "sessionId", "type": "bytes32", "indexed": true },
+        { "name": "recipient", "type": "address", "indexed": true },
+        { "name": "amount", "type": "uint256", "indexed": false },
+        { "name": "dayIndex", "type": "uint256", "indexed": false }
+      ]
+    },
+    {
+      "name": "ExceptionAuthorized",
+      "signature": "ExceptionAuthorized(string,string,address,address,uint256)",
+      "topic0": "0x2f05f82851e326c818ec44dd82c260cc93960d06b6f9844f70ebbb0eea65f624",
+      "inputs": [
+        { "name": "requestId", "type": "string", "indexed": true },
+        { "name": "approvalTier", "type": "string", "indexed": false },
+        { "name": "signer", "type": "address", "indexed": false },
+        { "name": "ownerCoSigner", "type": "address", "indexed": false },
+        { "name": "amount", "type": "uint256", "indexed": false }
+      ]
+    },
+    {
+      "name": "SessionRevoked",
+      "signature": "SessionRevoked(bytes32,address,string)",
+      "topic0": "0x9e4c1a851d09ea5f8d702479a3c6155d2bfcce14ff037d472805372b79c02022",
+      "inputs": [
+        { "name": "sessionId", "type": "bytes32", "indexed": true },
+        { "name": "triggeredBy", "type": "address", "indexed": true },
+        { "name": "reason", "type": "string", "indexed": false }
+      ]
+    },
+    {
+      "name": "SessionPaused",
+      "signature": "SessionPaused(bytes32,bool)",
+      "topic0": "0xa04a53b7d7334ae516e591b65ce5810f79c81823a7a558e89d23fe5ab2f8b596",
+      "inputs": [
+        { "name": "sessionId", "type": "bytes32", "indexed": true },
+        { "name": "isPaused", "type": "bool", "indexed": false }
+      ]
+    },
+    {
+      "name": "PolicyUpdated",
+      "signature": "PolicyUpdated(uint256,uint256,uint256,address,address)",
+      "topic0": "0xf3af810e328971ff1865074eb009ef85c2262281229c336083290b9b60f97a7a",
+      "inputs": [
+        { "name": "newPolicyVersion", "type": "uint256", "indexed": false },
+        { "name": "maxPerTx", "type": "uint256", "indexed": false },
+        { "name": "dailyLimit", "type": "uint256", "indexed": false },
+        { "name": "target", "type": "address", "indexed": false },
+        { "name": "recipient", "type": "address", "indexed": false }
+      ]
+    },
+    {
+      "name": "AgentHaltedByCircuitBreaker",
+      "signature": "AgentHaltedByCircuitBreaker(bytes32,string)",
+      "topic0": "0x91a95aa8b85a35386bf8fd61e86370a0573772df89425cb47ec02a005b44837b",
+      "inputs": [
+        { "name": "sessionId", "type": "bytes32", "indexed": true },
+        { "name": "reason", "type": "string", "indexed": false }
+      ]
+    },
+    {
+      "name": "OwnershipRecovered",
+      "signature": "OwnershipRecovered(address,address)",
+      "topic0": "0xe128477bbe7aa7b7eb781549b7d75eddf240959de7950f6e16e40f00bf1f140d",
+      "inputs": [
+        { "name": "oldOwner", "type": "address", "indexed": true },
+        { "name": "newOwner", "type": "address", "indexed": true }
+      ]
+    },
+    {
+      "name": "UserOperationEvent",
+      "signature": "UserOperationEvent(bytes32,address,address,uint256,bool,uint256,uint256)",
+      "topic0": "0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f",
+      "inputs": [
+        { "name": "userOpHash", "type": "bytes32", "indexed": true },
+        { "name": "sender", "type": "address", "indexed": true },
+        { "name": "paymaster", "type": "address", "indexed": true },
+        { "name": "nonce", "type": "uint256", "indexed": false },
+        { "name": "success", "type": "bool", "indexed": false },
+        { "name": "actualGasCost", "type": "uint256", "indexed": false },
+        { "name": "actualGasUsed", "type": "uint256", "indexed": false }
+      ]
+    },
+    {
+      "name": "UserOperationRevertReason",
+      "signature": "UserOperationRevertReason(bytes32,address,uint256,bytes)",
+      "topic0": "0x1c4fada7374c0a9ee8841fc38afe82932dc0f8e69012e927f061a8bae611a201",
+      "inputs": [
+        { "name": "userOpHash", "type": "bytes32", "indexed": true },
+        { "name": "sender", "type": "address", "indexed": true },
+        { "name": "nonce", "type": "uint256", "indexed": false },
+        { "name": "revertReason", "type": "bytes", "indexed": false }
+      ]
+    }
+  ]
+}

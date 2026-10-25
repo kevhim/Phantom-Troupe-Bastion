@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PaymentIntent",
+  "description": "Canonical ERC-4337 EIP-712 Typed Data Payment Intent Schema for Bastion X v2.3",
+  "type": "object",
+  "properties": {
+    "chainId": {
+      "type": "integer",
+      "description": "EVM Chain ID (e.g. 31337 for local Anvil)"
+    },
+    "verifyingAccount": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "Checksummed address of the BastionAccount smart contract"
+    },
+    "accountNonce": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Replay protection nonce tracked on-chain by BastionAccount"
+    },
+    "requestId": {
+      "type": "string",
+      "description": "Unique client/supervisor tracking identifier"
+    },
+    "policyVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Active policy epoch; incremented on policy updates and guardian rotations"
+    },
+    "actorSession": {
+      "type": "string",
+      "description": "Session identifier string for the delegated agent key"
+    },
+    "approvalTier": {
+      "type": "string",
+      "enum": ["JUNIOR_EXCEPTION", "SENIOR_EXCEPTION"],
+      "description": "Hardware approval tier selected via RFID card"
+    },
+    "tokenAddress": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "ERC-20 token address (e.g. MockToken bUSD)"
+    },
+    "targetContract": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "Target contract to invoke (typically tokenAddress for payments)"
+    },
+    "functionSelector": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{8}$",
+      "description": "4-byte function selector (e.g. 0xa9059cbb for transfer(address,uint256))"
+    },
+    "recipientAddress": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "Destination vendor address"
+    },
+    "amountBaseUnits": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Payment amount in token base units (e.g. 200 * 10^6 for 200 bUSD)"
+    },
+    "maxPerTxException": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Explicit per-transaction ceiling authorized for this exception"
+    },
+    "deadline": {
+      "type": "integer",
+      "description": "Unix timestamp expiration deadline for the exception"
+    },
+    "calldataHash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$",
+      "description": "Keccak256 hash of the exact ABI-encoded call payload"
+    }
+  },
+  "required": [
+    "chainId",
+    "verifyingAccount",
+    "accountNonce",
+    "requestId",
+    "policyVersion",
+    "actorSession",
+    "approvalTier",
+    "tokenAddress",
+    "targetContract",
+    "functionSelector",
+    "recipientAddress",
+    "amountBaseUnits",
+    "maxPerTxException",
+    "deadline",
+    "calldataHash"
+  ],
+  "additionalProperties": false
+}

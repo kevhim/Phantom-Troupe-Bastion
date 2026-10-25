@@ -1,0 +1,25 @@
+{
+  "name": "bastion",
+  "version": "1.0.0",
+  "description": "**Breach-Resilient AI Agent Wallet with Physical Transaction Review and Verifiable Forensic Flight Recorder.**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevhim/Phantom-Troupe-Bastion.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kevhim/Phantom-Troupe-Bastion/issues"
+  },
+  "homepage": "https://github.com/kevhim/Phantom-Troupe-Bastion#readme"
+}

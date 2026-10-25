@@ -1,0 +1,46 @@
+{
+  "description": "Frozen Canonical Test Vector for Cross-Platform EIP-712 Verification (Solidity, Python, TypeScript, ESP32 C++)",
+  "domain": {
+    "name": "BastionX",
+    "version": "2",
+    "chainId": 31337,
+    "verifyingContract": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+    "domainSeparator": "0x019dbbd0bc12d3b959f4905d64751301d6132acf9167a5c74f519d99d096e654"
+  },
+  "paymentIntent": {
+    "chainId": 31337,
+    "verifyingAccount": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+    "accountNonce": 0,
+    "requestId": "REQ-TEST-VECTOR-01",
+    "policyVersion": 1,
+    "actorSession": "SESSION-AI-AGENT-01",
+    "approvalTier": "JUNIOR_EXCEPTION",
+    "tokenAddress": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "targetContract": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "functionSelector": "0xa9059cbb",
+    "recipientAddress": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "amountBaseUnits": 250000000,
+    "maxPerTxException": 250000000,
+    "deadline": 1800000000,
+    "calldataHash": "0xc5c7791b5a780289d2727e8483cbf9df811ec1b3852a4cf06ef938b4c7fee1b0"
+  },
+  "calldata": {
+    "recipient": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "amount": 250000000,
+    "functionSelector": "0xa9059cbb",
+    "calldataHash": "0xc5c7791b5a780289d2727e8483cbf9df811ec1b3852a4cf06ef938b4c7fee1b0"
+  },
+  "cryptographicOutputs": {
+    "eip712SigningDigest": "0xdbd5bdf697c35a20b39c8b2eaadd3fd8dacd3221094d71378836798cfa8f3625",
+    "juniorSigner": {
+      "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "privateKey": "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
+      "signature": "0x9e5058bee3cd32bf2a2b4eae3ce7b84cfc7e4f18fb7265243bcb9b665bdd2239185f8b6fe9ee6851662689c43f5b03eb45c926b210a0855bc7ac2118eb9f61441c"
+    },
+    "ownerSigner": {
+      "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "privateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+      "signature": "0xa9577c7b5672ae8d4fa9a16c8c5ff70239a71795615fa86076a35974dd75099b3e35052083d70e491908ba2a4e3990d8d97cf0c8a79b747b023bc8e79636ad9e1b"
+    }
+  }
+}

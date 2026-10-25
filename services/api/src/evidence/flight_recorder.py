@@ -11,6 +11,17 @@ import uuid
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional, Tuple
 import os
+import re
+import threading
+import functools
+import httpx
+
+try:
+    from services.api.src.database import SessionLocal, AuditEntryRecord, IntegrityCheckpointRecord
+except ImportError:
+    SessionLocal = None
+    AuditEntryRecord = None
+    IntegrityCheckpointRecord = None
 
 GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -26,6 +37,7 @@ class ForensicEvent:
     sanitized_payload: Dict[str, Any]
     previous_event_hash: str
     current_event_hash: str
+    sequence: int = 0
 
     def to_canonical_json(self) -> str:
         """Produces deterministic, canonical JSON representation of fields for hashing."""
@@ -50,14 +62,49 @@ def compute_event_hash(previous_hash: str, canonical_json: str) -> str:
     return h.hexdigest()
 
 
+def serialized(method):
+    @functools.wraps(method)
+    def call(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return call
+
+
 class FlightRecorder:
-    def __init__(self, node_id: str = "laptop-a-main", checkpoint_storage_dir: Optional[str] = None):
+    def __init__(
+        self,
+        node_id: str = "laptop-a-main",
+        checkpoint_storage_dir: Optional[str] = None,
+        auto_persist_db: bool = False,
+    ):
+        self._lock = threading.RLock()
         self.node_id = node_id
         self.events: List[ForensicEvent] = []
         self.last_event_hash: str = GENESIS_HASH
         self.checkpoints: Dict[str, Dict[str, Any]] = {}
         self.checkpoint_storage_dir = checkpoint_storage_dir or os.path.join(os.getcwd(), "artifacts", "checkpoints")
-        os.makedirs(self.checkpoint_storage_dir, exist_ok=True)
+        self.laptop_b_checkpoint_dir = os.getenv("LAPTOP_B_CHECKPOINT_DIR", r"C:\bastion_audit_checkpoints")
+        self.auto_persist_db = auto_persist_db
+        try:
+            os.makedirs(self.checkpoint_storage_dir, exist_ok=True)
+        except Exception:
+            pass
+
+    @serialized
+    def restore(self):
+        """Resume the verified persistent chain on API startup, single worker only."""
+        if not self.auto_persist_db:
+            return
+        with SessionLocal() as db:
+            entries = db.query(AuditEntryRecord).order_by(AuditEntryRecord.sequence.asc()).all()
+            events = [ForensicEvent(e.event_id, 2, e.timestamp, e.event_source, e.correlation_id,
+                e.event_type, json.loads(e.sanitized_payload_json), e.prev_hash, e.entry_hash, e.sequence)
+                for e in entries]
+        valid, msg, _ = self.verify_event_chain(events)
+        if not valid or any(e.sequence != i + 1 for i, e in enumerate(events)):
+            raise RuntimeError(f"Stored audit trail invalid: {msg}")
+        self.events = events
+        self.last_event_hash = events[-1].current_event_hash if events else GENESIS_HASH
 
     def sanitize_payload(self, raw_payload: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -79,6 +126,7 @@ class FlightRecorder:
                 clean[k] = v
         return clean
 
+    @serialized
     def record_event(
         self,
         event_source: str,
@@ -88,7 +136,7 @@ class FlightRecorder:
         timestamp: Optional[float] = None,
     ) -> ForensicEvent:
         """
-        Appends an event to the cryptographically linked hash chain.
+        Appends an event to the cryptographically linked hash chain and persists to database.
         """
         evt_id = str(uuid.uuid4())
         ts = timestamp if timestamp is not None else time.time()
@@ -105,36 +153,154 @@ class FlightRecorder:
             sanitized_payload=sanitized,
             previous_event_hash=self.last_event_hash,
             current_event_hash="",
+            sequence=len(self.events) + 1,
         )
 
         canonical_json = temp_event.to_canonical_json()
         current_hash = compute_event_hash(self.last_event_hash, canonical_json)
         temp_event.current_event_hash = current_hash
 
+        # Persist to SQLite audit_entries if enabled
+        if self.auto_persist_db and SessionLocal and AuditEntryRecord:
+            try:
+                db = SessionLocal()
+                try:
+                    record = AuditEntryRecord(
+                        sequence=temp_event.sequence,
+                        event_id=temp_event.event_id,
+                        event_source=temp_event.event_source,
+                        correlation_id=temp_event.correlation_id,
+                        event_type=temp_event.event_type,
+                        sanitized_payload_json=json.dumps(temp_event.sanitized_payload, sort_keys=True),
+                        prev_hash=temp_event.previous_event_hash,
+                        entry_hash=temp_event.current_event_hash,
+                        timestamp=temp_event.timestamp,
+                    )
+                    db.add(record)
+                    db.commit()
+                finally:
+                    db.close()
+            except Exception as exc:
+                raise RuntimeError("Audit persistence failed; event was not accepted") from exc
+
         self.events.append(temp_event)
         self.last_event_hash = current_hash
         return temp_event
 
-    def create_checkpoint(self, checkpoint_id: str) -> Dict[str, Any]:
+    @serialized
+    def create_checkpoint(self, checkpoint_id: str, export_laptop_b: bool = True) -> Dict[str, Any]:
         """
         Generates an independent periodic checkpoint designed to be stored
         on Laptop B outside of the application's writable database.
         """
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,96}", checkpoint_id):
+            raise ValueError("Invalid checkpoint ID")
+        chain_valid, _, _ = self.verify_event_chain(self.events)
+        if not chain_valid:
+            raise ValueError("Cannot checkpoint corrupted evidence")
         checkpoint_data = {
             "checkpoint_id": checkpoint_id,
             "created_at_utc": time.time(),
             "event_count": len(self.events),
+            "sequence_tip": len(self.events),
             "tip_event_hash": self.last_event_hash,
             "node_id": self.node_id,
+            "chain_verified": chain_valid,
         }
         self.checkpoints[checkpoint_id] = checkpoint_data
 
-        # Persist checkpoint to disk
+        # Persist checkpoint to local disk
         file_path = os.path.join(self.checkpoint_storage_dir, f"{checkpoint_id}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(checkpoint_data, f, indent=2)
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(checkpoint_data, f, indent=2)
+        except Exception:
+            pass
+
+        # A local filesystem path on A is never independent Laptop B evidence.
+        exported_path = file_path
+        checkpoint_data["independent_status"] = "NOT_REQUESTED"
+        if export_laptop_b:
+            checkpoint_data["independent_status"] = "UNAVAILABLE"
+            url = os.getenv("SUPERVISOR_URL", "").rstrip("/")
+            token = os.getenv("CHECKPOINT_TOKEN", "")
+            try:
+                if not url or not token:
+                    raise ValueError("SUPERVISOR_URL and CHECKPOINT_TOKEN must be configured")
+                response = httpx.post(url + "/supervisor/audit/checkpoint", json=checkpoint_data,
+                    headers={"Authorization": f"Bearer {token}"}, timeout=3)
+                response.raise_for_status()
+                saved = response.json()
+                if saved.get("status") != "PRESERVED" or saved.get("checkpoint_id") != checkpoint_id:
+                    raise ValueError("Supervisor did not acknowledge this checkpoint")
+                checkpoint_data["independent_status"] = "PRESERVED_ON_B"
+                exported_path = saved["path"]
+            except Exception as exc:
+                checkpoint_data["independent_error"] = str(exc)
+
+        checkpoint_data["export_path"] = exported_path
+
+        # Persist to database IntegrityCheckpointRecord
+        if self.auto_persist_db and SessionLocal and IntegrityCheckpointRecord:
+            try:
+                db = SessionLocal()
+                try:
+                    rec = IntegrityCheckpointRecord(
+                        checkpoint_id=checkpoint_id,
+                        sequence_tip=len(self.events),
+                        tip_event_hash=self.last_event_hash,
+                        event_count=len(self.events),
+                        node_id=self.node_id,
+                        export_path=exported_path,
+                        verified=chain_valid,
+                    )
+                    db.add(rec)
+                    db.commit()
+                finally:
+                    db.close()
+            except Exception:
+                pass
 
         return checkpoint_data
+
+    @classmethod
+    def verify_stored_chain(cls, db_session=None) -> Tuple[bool, str, Optional[int]]:
+        """Verifies the persistent audit trail stored in SQLite."""
+        if not SessionLocal or not AuditEntryRecord:
+            return False, "Database models not available", None
+
+        close_after = False
+        db = db_session
+        if db is None:
+            db = SessionLocal()
+            close_after = True
+
+        try:
+            entries = db.query(AuditEntryRecord).order_by(AuditEntryRecord.sequence.asc()).all()
+            if not entries:
+                return True, "Stored audit chain is empty", None
+
+            reconstructed = []
+            for e in entries:
+                payload = json.loads(e.sanitized_payload_json) if e.sanitized_payload_json else {}
+                evt = ForensicEvent(
+                    event_id=e.event_id,
+                    schema_version=2,
+                    timestamp=e.timestamp,
+                    event_source=e.event_source,
+                    correlation_id=e.correlation_id,
+                    event_type=e.event_type,
+                    sanitized_payload=payload,
+                    previous_event_hash=e.prev_hash,
+                    current_event_hash=e.entry_hash,
+                    sequence=e.sequence,
+                )
+                reconstructed.append(evt)
+
+            return cls.verify_event_chain(reconstructed)
+        finally:
+            if close_after:
+                db.close()
 
     @staticmethod
     def verify_event_chain(events: List[ForensicEvent]) -> Tuple[bool, str, Optional[int]]:
@@ -174,6 +340,8 @@ class FlightRecorder:
         Verifies that current flight recorder matches an independent checkpoint held on Laptop B.
         """
         expected_count = checkpoint_data["event_count"]
+        if type(expected_count) is not int or expected_count < 0:
+            return False, "Invalid checkpoint event count"
         expected_tip = checkpoint_data["tip_event_hash"]
 
         if len(self.events) < expected_count:
@@ -185,8 +353,9 @@ class FlightRecorder:
         if not valid:
             return False, f"Chain corrupted before checkpoint: {msg}"
 
-        if slice_events[-1].current_event_hash != expected_tip:
-            return False, f"Tip hash mismatch: slice tip is {slice_events[-1].current_event_hash}, checkpoint expects {expected_tip}"
+        actual_tip = slice_events[-1].current_event_hash if slice_events else GENESIS_HASH
+        if actual_tip != expected_tip:
+            return False, f"Tip hash mismatch: slice tip is {actual_tip}, checkpoint expects {expected_tip}"
 
         return True, f"Flight recorder strictly conforms to checkpoint {checkpoint_data['checkpoint_id']}"
 
@@ -201,6 +370,9 @@ class FlightRecorder:
             "correlation_id": correlation_id,
             "total_events": len(matched_events),
             "timeline": matched_events,
+            "verification_events": [asdict(e) for e in self.events],
+            "checkpoints": list(self.checkpoints.values()),
+            "independent_validation": "Fetch the original checkpoint directly from Laptop B; this export alone is not a trusted anchor",
             "tip_event_hash": self.last_event_hash,
             "chain_integrity": self.verify_event_chain(self.events)[0],
         }

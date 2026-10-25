@@ -14,6 +14,7 @@
 *.db
 *.sqlite
 *.sqlite3
+*.zip
 *.pem
 *.key
 *.p12
@@ -23,4 +24,8 @@ recordings/
 models/
 .DS_Store
 Thumbs.db
+
+# Local integration evidence and private device provisioning
+scratch/
+firmware/esp32_signer/config.h
 *.tsbuildinfo

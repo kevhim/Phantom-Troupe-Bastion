@@ -42,20 +42,45 @@ The ESP32 receives unsigned requests from an untrusted computer. It doesn't need
 5. Use short, reliable review countdown (10-30 sec user interaction); on-chain approval lifetime longer to handle block inclusion (e.g. 120 sec). Once transmitted, expiration and one-use nonce remain enforced on chain.
 6. **Approval button** never directly authorizes a transaction without the proper signature. **Panic button** always wins over pending signing.
 
-## Implementation Status in v2.1
-- Firmware implementation: `firmware/esp32_signer/esp32_signer.ino`
-- 4-page OLED pagination cycling via `millis()` or button press:
-  - Page 0: Request ID, Tier (JUNIOR/SENIOR/STANDARD), Chain ID, Nonce
-  - Page 1: Target Contract and Function Selector
-  - Page 2: Recipient Address (paginated high/low chunks) and Amount in bUSD
-  - Page 3: Calldata Fingerprint, Expiry Deadline, Action Status
-- Physical Pin Mapping:
-  - SPI RC522 reader: SCK=GPIO18, MISO=GPIO19, MOSI=GPIO23, SS=GPIO5, RST=GPIO27
-  - I2C Dual OLED (SSD1306): SDA=GPIO21, SCL=GPIO22 (Primary Review OLED #1 at 0x3C, fail-closed; Auxiliary Status OLED #2 at 0x3D, non-blocking)
-  - Approve Button: GPIO33 (INPUT_PULLUP, requires >= 1.5s sustained press)
-  - Panic Button: GPIO32 (INPUT_PULLUP, instant ISR interrupt, aborts signing and invokes direct Wi-Fi RPC revocation)
-- Python Cryptographic Verification: `services/device_crypto/crypto_engine.py` implements canonical EIP-712 hashing and dual ECDSA recovery.
-- Automated Test Matrix: 11 tests in `tests/test_policy_and_signatures.py` validating replay resistance, chain ID mismatch, signer forgery, and out-of-policy exception boundaries.
+## Implementation Status in v2.3 (Phases 4 + 5 Verified)
+- **Firmware Implementation:** `firmware/esp32_signer/esp32_signer.ino`, `crypto_utils.cpp`, `keccak256.cpp`
+- **On-Device Cryptographic Engine:**
+  - Micro-ecc secp256k1 ECDSA signing with canonical low-s (`s <= 0x7FFFFFFF...`).
+  - RFC 6979 deterministic k derivation to prevent k-reuse private key leakage.
+  - Canonical Keccak-256 implementation matching Ethereum EVM.
+  - EIP-712 Domain Typehash: `keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")` (`0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f`).
+  - Bit-for-bit test vector alignment: digest `0xdbd5bdf697c35a20b39c8b2eaadd3fd8dacd3221094d71378836798cfa8f3625` matching `schemas/signing/test_vectors.json`, recovering exactly to Junior Signer `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC`.
+- **4-Page OLED Trusted Review (Fail-Closed):**
+  - Primary SSD1306 OLED #1 at `0x3C` mandatory; missing or disconnected display locks device and aborts signing.
+  - Page 0: Request ID, Tier (JUNIOR/SENIOR), Chain ID, Nonce.
+  - Page 1: Target Contract and Function Selector.
+  - Page 2: Recipient Address (paginated high/low 20-byte chunks) and Amount in bUSD.
+  - Page 3: Calldata Fingerprint (8-byte hex), Expiry Deadline, Action Status.
+  - Auxiliary SSD1306 OLED #2 at `0x3D` provides status telemetry (block height, session status, budget stats) non-blockingly.
+- **Physical Pin Mapping & Hardware Controls:**
+  - SPI RC522 RFID: SCK=GPIO18, MISO=GPIO19, MOSI=GPIO23, SS=GPIO5, RST=GPIO27.
+  - Shared I2C: SDA=GPIO21, SCL=GPIO22 (OLED #1 @ 0x3C fail-closed review, OLED #2 @ 0x3D status).
+  - Physical Approve Button: GPIO33 (INPUT_PULLUP, sustained press >= 1.5s; serial commands cannot spoof physical input).
+  - Physical Panic Button: GPIO32 (INPUT_PULLUP, instant ISR interrupt, aborts signing and triggers direct RPC revocation).
+- **Independent Panic Revocation Lifecycle:**
+  - State Progression: `PANIC_LOCAL` -> `REVOKE_SIGNED` -> `REVOKE_SUBMITTED` -> `REVOKE_CONFIRMED` / `REVOKE_FAILED` / `REVOKE_UNAVAILABLE`.
+  - Dedicated Revoker Signer: Anvil Account #4 (`0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65`), authorized in `BastionAccount.revokerRole`.
+  - Direct Wi-Fi RPC: Bypasses Laptop A application host; communicates directly with Laptop B Anvil node (`:8545`).
+  - Verifies mined receipt (`status == 1`) and on-chain state (`revokedSessions(sId) == True`) before asserting `REVOKE_CONFIRMED`.
+  - If Wi-Fi or RPC is offline, reports `REVOKE_UNAVAILABLE` truthfully.
+- **Hardware Security Test Suite:**
+  - Verified by `tests/firmware/test_esp32_hardware_security.py` (11 of 11 passing on physical hardware COM10):
+    1. Valid device signature matches `schemas/signing/test_vectors.json`.
+    2. Modified recipient or amount rejected.
+    3. Wrong chain ID rejected.
+    4. Replayed approval rejected (`REPLAYED_NONCE`).
+    5. Unknown RFID UID rejected (`UNKNOWN_RFID`).
+    6. Physical button spoofing rejected without low pin.
+    7. Device disconnection fails closed.
+    8. ESP32 reboot recovery verified.
+    9. Emergency panic lifecycle verified.
+    10. Blockchain RPC failure reported truthfully (`REVOKE_UNAVAILABLE`).
+    11. Confirmed revocation verified on chain.
 
 ## Chain/UI claims
 Card UID = demo role selection / weak credential. OLED = more independent review but not 'unhackable'. ESP32 = isolated application signer, not production hardware-backed key vault. A stronger biometric anti-deepfake system would need independent trusted camera input and genuine identity verification; current finger gestures do not provide those assurances.

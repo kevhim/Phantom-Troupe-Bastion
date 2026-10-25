@@ -1,39 +1,37 @@
-# BASTION X v2.3 — Cross-Laptop Network & Integration Diagnostic
 param(
-    [string]$LaptopAIp = "127.0.0.1",
-    [string]$LaptopBIp = "127.0.0.1"
+    [Parameter(Mandatory=$true)][string]$LaptopAIp,
+    [Parameter(Mandatory=$true)][string]$LaptopBIp
 )
-
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  BASTION X v2.3 — Cross-Laptop Integration Pre-Flight   " -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Cyan
-
-# 1. Test Laptop A API
-Write-Host "`n[1/3] Testing Laptop A Application API ($LaptopAIp:8000)..." -ForegroundColor Yellow
-try {
-    $api = Invoke-RestMethod -Uri "http://${LaptopAIp}:8000/api/v2/overview" -TimeoutSec 3
-    Write-Host "  [OK] Laptop A API is reachable. Total Forensic Events: $($api.total_forensic_events)" -ForegroundColor Green
-} catch {
-    Write-Host "  [FAIL] Cannot reach Laptop A API: $_" -ForegroundColor Red
+$ErrorActionPreference = 'Stop'
+$failed = $false
+$root = Split-Path -Parent $PSScriptRoot
+$manifest = Get-Content "$root/contracts/deployments.json" -Raw | ConvertFrom-Json
+function Rpc($url, $method, $params) {
+    $body = @{jsonrpc='2.0'; id=1; method=$method; params=@($params)} | ConvertTo-Json -Depth 8 -Compress
+    $response = Invoke-RestMethod -Uri $url -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 4
+    if ($response.error) { throw ($response.error | ConvertTo-Json -Compress) }
+    return $response.result
 }
-
-# 2. Test Laptop B Blockchain RPC
-Write-Host "`n[2/3] Testing Laptop B Anvil RPC ($LaptopBIp:8545)..." -ForegroundColor Yellow
 try {
-    $body = '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
-    $rpc = Invoke-RestMethod -Uri "http://${LaptopBIp}:8545" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 3
-    Write-Host "  [OK] Laptop B Anvil RPC is reachable. Chain ID: $($rpc.result)" -ForegroundColor Green
-} catch {
-    Write-Host "  [FAIL] Cannot reach Laptop B Anvil RPC: $_" -ForegroundColor Red
-}
-
-# 3. Test Laptop B Supervisor Service & Uno #1 Buzzer
-Write-Host "`n[3/3] Testing Laptop B Supervisor API ($LaptopBIp:8005)..." -ForegroundColor Yellow
+    $policy = Invoke-RestMethod -Uri "http://${LaptopAIp}:8000/api/v2/integration/status" -TimeoutSec 8
+    if (!$policy.policy.connected) { throw 'A cannot read live chain policy' }
+    Write-Host '[OK] A API can read chain policy'
+} catch { $failed=$true; Write-Host "[FAIL] A API: $_" }
 try {
-    $sup = Invoke-RestMethod -Uri "http://${LaptopBIp}:8005/supervisor/health" -TimeoutSec 3
-    Write-Host "  [OK] Laptop B Supervisor reachable. Signer: $($sup.peripherals.esp32_signer), Uno #1 Buzzer: $($sup.peripherals.uno_buzzer)" -ForegroundColor Green
-} catch {
-    Write-Host "  [WARN] Supervisor API not responding on port 8005 (Supervisor may not be running): $_" -ForegroundColor Yellow
-}
-
-Write-Host "`nPre-flight diagnostics completed! (ESP8266 removed in v2.3; buzzer verified on Uno #1 Pin D8)" -ForegroundColor Cyan
+    $chain = Rpc "http://${LaptopBIp}:8545" 'eth_chainId' @()
+    if ([Convert]::ToInt64($chain,16) -ne 31337) { throw "Wrong chain: $chain" }
+    foreach ($name in 'entryPoint','bastionAccount','mockToken','circuitBreaker') {
+        $code = Rpc "http://${LaptopBIp}:8545" 'eth_getCode' @($manifest.$name,'latest')
+        if (!$code -or $code -eq '0x') { throw "No bytecode for $name" }
+    }
+    $supported = Rpc "http://${LaptopBIp}:3000" 'eth_supportedEntryPoints' @()
+    if ($manifest.entryPoint -notin $supported) { throw 'Bundler EntryPoint mismatch' }
+    Write-Host '[OK] Chain ID, bytecode presence and bundler EntryPoint match local manifest'
+} catch { $failed=$true; Write-Host "[FAIL] B chain/bundler: $_" }
+try {
+    $sup = Invoke-RestMethod -Uri "http://${LaptopBIp}:8010/supervisor/health" -TimeoutSec 4
+    Write-Host "[OBSERVED] Supervisor reachable; signer=$($sup.peripherals.esp32_signer); buzzer=$($sup.peripherals.uno_buzzer)"
+} catch { $failed=$true; Write-Host "[FAIL] B supervisor: $_" }
+Write-Host 'Network checks do not verify serial ownership, wiring, physical review or audible buzzer operation.'
+if ($failed) { exit 1 }
+exit 0

@@ -168,7 +168,7 @@ contract BastionAccount is IAccount {
 
         // Recover signer from userOpHash
         address signer = recoverSigner(userOpHash, userOp.signature);
-        if (signer != agentSessionKey && signer != owner) {
+        if (signer == address(0) || (signer != agentSessionKey && signer != owner)) {
             return 1; // Unauthorized signer
         }
 
@@ -273,6 +273,7 @@ contract BastionAccount is IAccount {
 
         // 4. Verify ESP32 Hardware Device Signature
         address recoveredDeviceSigner = recoverSigner(digest, deviceSignature);
+        require(recoveredDeviceSigner != address(0), "Exception: Invalid device signature");
         bool isJunior = keccak256(bytes(intent.approvalTier)) == keccak256(bytes("JUNIOR_EXCEPTION"));
         bool isSenior = keccak256(bytes(intent.approvalTier)) == keccak256(bytes("SENIOR_EXCEPTION"));
 
@@ -290,7 +291,7 @@ contract BastionAccount is IAccount {
         address recoveredOwner = address(0);
         if (strictOwnerExceptionMode) {
             recoveredOwner = recoverSigner(digest, ownerSignature);
-            require(recoveredOwner == owner, "Exception: Invalid owner co-signature");
+            require(recoveredOwner != address(0) && recoveredOwner == owner, "Exception: Invalid owner co-signature");
         }
 
         // 6. Verify Calldata Hash Matching
@@ -419,6 +420,9 @@ contract BastionAccount is IAccount {
             r := mload(add(signature, 0x20))
             s := mload(add(signature, 0x40))
             v := byte(0, mload(add(signature, 0x60)))
+        }
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            return address(0);
         }
         if (v < 27) v += 27;
         if (v != 27 && v != 28) return address(0);

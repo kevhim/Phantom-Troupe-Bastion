@@ -11,7 +11,17 @@ try {
     Write-Host "[FAIL] Anvil Blockchain not responding on port 8545: $_" -ForegroundColor Red
 }
 
-# 2. Check Supervisor Service & Uno #1 Buzzer
+# 2. Check ERC-4337 Bundler RPC
+try {
+    $bundlerRes = Invoke-RestMethod -Uri "http://localhost:3000/status" -TimeoutSec 3
+    Write-Host "[OK] ERC-4337 Bundler is ONLINE on port 3000" -ForegroundColor Green
+    Write-Host "     EntryPoint: $($bundlerRes.entryPoint)" -ForegroundColor Gray
+    Write-Host "     BastionAccount: $($bundlerRes.bastionAccount)" -ForegroundColor Gray
+} catch {
+    Write-Host "[FAIL] ERC-4337 Bundler not responding on port 3000: $_" -ForegroundColor Red
+}
+
+# 3. Check Supervisor Service & Uno #1 Buzzer
 try {
     $supRes = Invoke-RestMethod -Uri "http://localhost:8010/supervisor/health" -TimeoutSec 3
     Write-Host "[OK] Supervisor Service is ONLINE on port 8010" -ForegroundColor Green
